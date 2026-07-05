@@ -1,0 +1,59 @@
+:root {
+  /* Surface */
+  --bg: #FDFCFA;
+  --card: #FFFFFF;
+  --sidebar: #F9F7F4;
+  --border: #EEEBE6;
+  --border-strong: #D8D3CB;
+
+  /* Text */
+  --text-primary: #1A1714;
+  --text-secondary: #6B6560;
+  --text-tertiary: #A09990;
+  --text-inverse: #FFFFFF;
+
+  /* Accent */
+  --accent: #1A1714;
+  --accent-hover: #2E2926;
+  --accent-subtle: #F0EDE8;
+
+  /* Lifecycle stage colors */
+  --stage-inquiry: #6B7280;
+  --stage-qualified: #2563EB;
+  --stage-trial-booked: #7C3AED;
+  --stage-attended: #059669;
+  --stage-reviewed: #D97706;
+  --stage-rebooked: #0891B2;
+  --stage-vip: #DC2626;
+
+  /* Channel colors */
+  --channel-whatsapp: #25D366;
+  --channel-instagram: #E1306C;
+  --channel-line: #00B900;
+  --channel-webchat: #6366F1;
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 220ms;
+  --duration-slow: 400ms;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px 0 rgba(26,23,20,0.04);
+  --shadow: 0 2px 8px 0 rgba(26,23,20,0.06), 0 1px 2px 0 rgba(26,23,20,0.04);
+  --shadow-lg: 0 8px 24px 0 rgba(26,23,20,0.08), 0 2px 6px 0 rgba(26,23,20,0.04);
+
+  /* Sidebar */
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+
+  /* Typography */
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}

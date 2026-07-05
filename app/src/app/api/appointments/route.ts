@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { IS_MOCK, MockDB } from '@/lib/mock-store'
+import { connectDb } from '@/lib/db'
+import { Appointment } from '@/models/Appointment'
+import { serializeDoc } from '@/lib/serialize'
+
+const DEFAULT_WORKSPACE_ID = 'ws-1'
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+
+  if (IS_MOCK) {
+    return NextResponse.json({ data: MockDB.getAppointments(workspaceId) })
+  }
+
+  await connectDb()
+  const appointments = await Appointment.find({ workspaceId }).sort({ startsAt: 1 }).lean()
+  return NextResponse.json({ data: appointments.map(serializeDoc) })
+}
+
+const createSchema = z.object({
+  workspaceId: z.string().min(1).default(DEFAULT_WORKSPACE_ID),
+  contactName: z.string().min(1).max(200),
+  contactId: z.string().nullable().default(null),
+  className: z.string().min(1).max(200),
+  startsAt: z.string().datetime(),
+  durationMin: z.number().int().min(5).max(480).default(60),
+  channel: z.string().min(1).default('whatsapp'),
+  kind: z.enum(['trial', 'regular', 'consult']).default('regular'),
+})
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  let body: unknown
+  try { body = await req.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = createSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+  const { startsAt, ...rest } = parsed.data
+  const apptData = { ...rest, startsAt: new Date(startsAt) }
+
+  if (IS_MOCK) {
+    const appt = MockDB.createAppointment(apptData)
+    return NextResponse.json({ data: appt }, { status: 201 })
+  }
+
+  await connectDb()
+  const created = await Appointment.create(apptData)
+  return NextResponse.json({ data: serializeDoc(created.toObject()) }, { status: 201 })
+}

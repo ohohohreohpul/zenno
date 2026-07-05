@@ -1,0 +1,23 @@
+// Next.js 16 renamed `middleware.ts` to `proxy.ts` (middleware convention is
+// deprecated). Proxy runs on the Node.js runtime by default in v16, so we can
+// do full HMAC signature + expiry verification here with node:crypto.
+import { NextResponse, type NextRequest } from 'next/server'
+import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth'
+
+export function proxy(request: NextRequest): NextResponse {
+  const token = request.cookies.get(SESSION_COOKIE)?.value
+  const session = token ? verifySessionToken(token) : null
+
+  if (!session) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  // Only dashboard pages. /api/* stays open (webhooks must not be blocked).
+  matcher: '/dashboard/:path*',
+}
