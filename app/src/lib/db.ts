@@ -12,7 +12,15 @@ export async function connectDb(): Promise<void> {
   if (!uri) throw new Error('MONGODB_URI environment variable is not set')
 
   if (!global._mongooseConn) {
-    global._mongooseConn = mongoose.connect(uri, { bufferCommands: false })
+    // Drop the cached promise on failure — otherwise a warm serverless
+    // instance whose first connect failed keeps re-awaiting the same
+    // rejected promise and never retries.
+    global._mongooseConn = mongoose.connect(uri, { bufferCommands: false }).catch(
+      (error: unknown) => {
+        global._mongooseConn = undefined
+        throw error
+      },
+    )
   }
 
   await global._mongooseConn
