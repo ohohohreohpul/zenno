@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
+import { isValidObjectId } from 'mongoose'
 import { IS_MOCK, MockDB } from './mock-store'
 import { connectDb } from './db'
 import { ScheduleSlot } from '@/models/ScheduleSlot'
@@ -93,11 +94,15 @@ export const dbToolStore: AgentToolStore = {
     return slots.map(toSlotData)
   },
   getScheduleSlot: async (id) => {
+    // The id comes from the model, which may invent non-ObjectId strings —
+    // treat "not a valid id" as "not found" so the agent can self-correct.
+    if (!isValidObjectId(id)) return null
     await connectDb()
     const slot = await ScheduleSlot.findById(id).lean<LeanSlot | null>()
     return slot ? toSlotData(slot) : null
   },
   incrementSlotBooking: async (id) => {
+    if (!isValidObjectId(id)) return null
     await connectDb()
     const slot = await ScheduleSlot.findById(id).lean<LeanSlot | null>()
     if (!slot || slot.booked >= slot.capacity) return null
@@ -293,7 +298,16 @@ export async function generateAgentReply(
     systemPrompt + TOOL_GUIDANCE,
     [...history.slice(-12), { role: 'user', content: incomingText }],
     toolDefs,
-    (name, input) => runTool(store, name, input, ctx, result),
+    async (name, input) => {
+      // A tool failure must never kill the conversation — surface it to the
+      // model as a result it can react to (retry, apologize, or escalate).
+      try {
+        return await runTool(store, name, input, ctx, result)
+      } catch (error: unknown) {
+        console.error(`[agent-tools] tool "${name}" failed:`, error)
+        return { error: 'Tool call failed. Check the schedule again or use flag_for_human.' }
+      }
+    },
     MAX_REPLY_TOKENS,
   )
 

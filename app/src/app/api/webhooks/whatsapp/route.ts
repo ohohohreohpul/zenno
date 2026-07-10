@@ -36,9 +36,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   for (const msg of messages) {
     try {
       await handleIncoming(workspaceId, msg)
-    } catch {
+    } catch (error: unknown) {
       // A failure on one message must not fail the webhook — the provider
       // would retry the whole batch and duplicate the others.
+      console.error('[webhook:whatsapp] message handling failed:', error)
     }
   }
 

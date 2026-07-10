@@ -103,7 +103,8 @@ async function generateReplyWithTools(
       channel: contact.channel,
     })
     return result.reply || null
-  } catch {
+  } catch (error) {
+    console.error('[conversation] agent reply failed:', error)
     return null
   }
 }
