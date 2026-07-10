@@ -58,7 +58,7 @@ export async function handleIncoming(
   })
 
   // Best-effort transmission — the reply is already stored either way.
-  await deliverMessage(incoming.channel, incoming.external_contact_id, reply)
+  await deliverMessage(workspaceId, incoming.channel, incoming.external_contact_id, reply, { kind: 'reply' })
 
   if (contact.lifecycleStage === 'inquiry') {
     await advanceLifecycle(contactId, 'qualified')

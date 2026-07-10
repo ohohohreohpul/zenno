@@ -102,7 +102,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         aiGenerated: true,
       })
       const contact = await Contact.findById(t.contactId).select('externalId').lean()
-      if (contact) await deliverMessage(t.channel, contact.externalId, t.message)
+      if (contact) await deliverMessage(workspaceId, t.channel, contact.externalId, t.message, { kind: 'bulk' })
     }
   }
 

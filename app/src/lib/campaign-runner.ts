@@ -80,7 +80,7 @@ async function sendCampaignMessage(
     ?? (await Contact.findById(contact.id).select('externalId').lean())?.externalId
   if (externalId) {
     const { deliverMessage } = await import('./transport')
-    await deliverMessage(contact.channel, externalId, message.content)
+    await deliverMessage(workspaceId, contact.channel, externalId, message.content, { kind: 'bulk' })
   }
 }
 

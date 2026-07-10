@@ -3,20 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Check, AlertCircle, ExternalLink } from 'lucide-react'
 import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './GuardrailsSection'
+import { WhatsAppConnectCard } from './WhatsAppConnectCard'
 
 const CHANNELS = [
-  {
-    id: 'whatsapp',
-    name: 'WhatsApp',
-    description: 'Official 360dialog Business API',
-    color: 'var(--channel-whatsapp)',
-    fields: [
-      { key: 'api_key', label: 'API Key', placeholder: 'D3l7a_xxxx', type: 'password' },
-      { key: 'phone_number', label: 'Phone Number', placeholder: '+66812345678', type: 'text' },
-    ],
-    docsUrl: 'https://docs.360dialog.com/',
-    connected: true,
-  },
   {
     id: 'instagram',
     name: 'Instagram DM',
@@ -176,6 +165,7 @@ export function SettingsView() {
 
         {activeTab === 'channels' && (
           <div style={{ maxWidth: 680, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <WhatsAppConnectCard />
             {CHANNELS.map((ch) => (
               <ChannelCard key={ch.id} channel={ch} />
             ))}

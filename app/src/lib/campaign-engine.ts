@@ -1,8 +1,6 @@
 import { connectDb } from './db'
 import { campaignQueue } from './queue'
-import { sendWhatsApp } from './channels/whatsapp'
-import { sendInstagram } from './channels/instagram'
-import { sendLine } from './channels/line'
+import { deliverMessage } from './transport'
 import { Campaign } from '@/models/Campaign'
 import { CampaignEnrollment } from '@/models/CampaignEnrollment'
 import { Contact } from '@/models/Contact'
@@ -66,7 +64,7 @@ export async function processStep(data: CampaignJobData): Promise<void> {
   switch (node.type) {
     case 'message': {
       const channel = (node.channel ?? contact.channel) as Channel
-      await sendOnChannel(channel, contact.externalId, node.content)
+      await deliverMessage(workspaceId, channel, contact.externalId, node.content, { kind: 'bulk' })
       await Message.create({
         workspaceId,
         contactId,
@@ -123,13 +121,4 @@ async function exitEnrollment(
   status: 'completed' | 'exited',
 ): Promise<void> {
   await CampaignEnrollment.findByIdAndUpdate(enrollmentId, { status })
-}
-
-async function sendOnChannel(channel: Channel, externalId: string, text: string): Promise<void> {
-  switch (channel) {
-    case 'whatsapp':   await sendWhatsApp(externalId, text); break
-    case 'instagram':  await sendInstagram(externalId, text); break
-    case 'line':       await sendLine(externalId, text); break
-    default:           console.warn(`Campaign send not implemented for: ${channel}`)
-  }
 }

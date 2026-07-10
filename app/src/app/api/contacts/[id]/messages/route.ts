@@ -138,7 +138,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
     // A human replied — pause the bot so it doesn't talk over the operator.
     const botPaused = contact.botActive !== false
     if (botPaused) await Contact.findByIdAndUpdate(contactId, { $set: { botActive: false } })
-    const delivery = await deliverMessage(contact.channel, contact.externalId, parsed.data.content)
+    const delivery = await deliverMessage(contact.workspaceId, contact.channel, contact.externalId, parsed.data.content, { kind: 'reply' })
     return NextResponse.json({ data: msg, delivery, bot_paused: botPaused }, { status: 201 })
   }
 
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
       content: replyText,
       aiGenerated: true,
     })
-    const delivery = await deliverMessage(contact.channel, contact.externalId, replyText)
+    const delivery = await deliverMessage(contact.workspaceId, contact.channel, contact.externalId, replyText, { kind: 'reply' })
     return NextResponse.json({ data: msg, reply, delivery }, { status: 201 })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'AI reply failed'
