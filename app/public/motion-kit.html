@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Zenno · Motion Kit</title>
+<style>
+/* ================= Zenno tokens (mirror of app tokens.css) ================= */
+:root{
+  --bg:#FDFCFA; --card:#FFFFFF; --sidebar:#F9F7F4; --border:#EEEBE6; --border-strong:#D8D3CB;
+  --text:#1A1714; --text-2:#6B6560; --text-3:#A09990; --inverse:#FFFFFF;
+  --accent:#1A1714; --accent-subtle:#F0EDE8;
+  --green:#059669; --purple:#7C3AED; --red:#DC2626;
+  --wa:#25D366; --tg:#26A5E4; --ln:#00B900; --ms:#0084FF; --wc:#6366F1; --ig:#E1306C;
+  --r-sm:6px; --r:10px; --r-lg:14px; --r-xl:20px;
+  /* motion tokens */
+  --dur-1:120ms; --dur-2:180ms; --dur-3:240ms; --dur-4:300ms; --dur-5:500ms; --dur-ill:900ms;
+  --out-quart:cubic-bezier(.165,.84,.44,1);
+  --out-expo:cubic-bezier(.19,1,.22,1);
+  --inout-cubic:cubic-bezier(.645,.045,.355,1);
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:48px 24px;display:flex;flex-direction:column;gap:56px;align-items:center}
+h1{font-size:22px}
+.hint{font-size:12px;color:var(--text-3)}
+section{width:100%;max-width:860px;display:flex;flex-direction:column;gap:16px}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--text-3)}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px}
+
+/* ================= 1. Scroll reveal (spatial · ease-out-quart · 500ms) ================= */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity var(--dur-5) var(--out-quart),transform var(--dur-5) var(--out-quart)}
+.reveal.in{opacity:1;transform:none}
+.reveal[data-d="1"]{transition-delay:80ms}.reveal[data-d="2"]{transition-delay:160ms}.reveal[data-d="3"]{transition-delay:240ms}
+
+/* ================= 2. Buttons (feedback · 150ms ease / press dur-1) ================= */
+.btn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;font:inherit;font-size:13px;font-weight:600;
+  padding:12px 20px;border-radius:var(--r-sm);background:var(--accent);color:var(--inverse);
+  transition:background 150ms ease,transform var(--dur-1) var(--out-quart)}
+.btn:hover{background:#2E2926}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn.ghost:hover{background:var(--accent-subtle)}
+.btn .arrow{display:inline-block;transition:transform var(--dur-2) var(--out-quart)}
+.btn:hover .arrow{transform:translateX(3px)}
+
+/* ================= 3. Chat auto-play (illustrative · staged enters) ================= */
+.chat{width:300px;background:var(--sidebar);border:1px solid var(--border);border-radius:var(--r-xl);padding:16px;display:flex;flex-direction:column;gap:10px;min-height:280px}
+.chat-head{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--text-2)}
+.cdot{width:9px;height:9px;border-radius:99px;background:var(--wa)}
+.msg{max-width:82%;padding:9px 12px;border-radius:12px;font-size:12.5px;line-height:1.45;
+  opacity:0;transform:translateY(10px) scale(.97)}
+.msg.show{opacity:1;transform:none;transition:opacity var(--dur-4) var(--out-quart),transform var(--dur-4) var(--out-quart)}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--inverse);border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px}
+.booked{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:10px;font-weight:700;color:var(--green);
+  opacity:0;transform:scale(.9)}
+.booked.show{opacity:1;transform:none;transition:opacity var(--dur-3) var(--out-quart),transform var(--dur-3) var(--out-quart)}
+.typing{align-self:flex-start;display:none;gap:4px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:12px;border-bottom-left-radius:4px}
+.typing.on{display:inline-flex}
+.typing i{width:6px;height:6px;border-radius:99px;background:var(--text-3);animation:tp 1s linear infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+
+/* ================= 4. Count-up stats (illustrative, JS rAF ease-out) ================= */
+.stat{min-width:150px}
+.stat b{font-size:34px;font-weight:700;display:block;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--text-2)}
+.stat.dark{background:var(--accent);border-color:var(--accent)}
+.stat.dark b{color:var(--inverse)}.stat.dark span{color:#A8A29B}
+
+/* ================= 5. Channel marquee (time-based · linear) ================= */
+.marquee{overflow:hidden;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--card);padding:14px 0;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marquee-track{display:flex;gap:12px;width:max-content;animation:mq 22s linear infinite}
+.marquee:hover .marquee-track{animation-play-state:paused}
+@keyframes mq{to{transform:translateX(-50%)}}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border);border-radius:99px;font-size:12px;font-weight:600;background:var(--bg);white-space:nowrap}
+.chip i{width:10px;height:10px;border-radius:99px;display:inline-block}
+
+/* ================= 6. QR scan → connected (illustrative sequence) ================= */
+.qrwrap{display:flex;align-items:center;gap:20px}
+.qrbox{position:relative;width:120px;height:120px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;overflow:hidden}
+.qrgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;width:100%;height:100%}
+.qrgrid i{background:var(--accent);border-radius:2px;opacity:.9}
+.qrgrid i.o{background:var(--border)}
+.scanline{position:absolute;left:8px;right:8px;top:0;height:2px;background:var(--green);box-shadow:0 0 12px var(--green);animation:scan 2.2s linear infinite}
+@keyframes scan{0%{top:8%}50%{top:88%}100%{top:8%}}
+.qrbox.done .scanline{display:none}
+.qrcheck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--card);opacity:0;transform:scale(.92)}
+.qrbox.done .qrcheck{opacity:1;transform:none;transition:opacity var(--dur-3) var(--out-quart),transform var(--dur-3) var(--out-quart)}
+.qrcheck b{width:44px;height:44px;border-radius:99px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}
+.qrstate{font-size:12px;color:var(--text-2);font-weight:600}
+.qrstate .ok{color:var(--green);display:none}
+.qrwrap.done .ok{display:inline}.qrwrap.done .waiting{display:none}
+
+/* ================= 7. Calendar slot fill (morph · inout-cubic) ================= */
+.cal{display:grid;grid-template-columns:repeat(4,44px);gap:8px}
+.cal i{height:30px;border-radius:7px;background:var(--accent-subtle);transition:background var(--dur-3) var(--inout-cubic),transform var(--dur-3) var(--out-quart)}
+.cal i.target.fill{background:var(--green);transform:scale(1.06)}
+.cal i.target.fill::after{content:'✓';color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;height:100%}
+
+/* ================= 8. Warm-up gauge (staggered grow) ================= */
+.gauge{display:flex;align-items:flex-end;gap:5px;height:56px}
+.gauge i{width:12px;border-radius:3px;background:var(--green);transform-origin:bottom;transform:scaleY(0);transition:transform var(--dur-5) var(--out-quart)}
+.gauge i.idle{background:var(--border)}
+.gauge.go i{transform:scaleY(1)}
+.gauge i:nth-child(1){height:12px;transition-delay:0ms}.gauge i:nth-child(2){height:20px;transition-delay:70ms}
+.gauge i:nth-child(3){height:28px;transition-delay:140ms}.gauge i:nth-child(4){height:38px;transition-delay:210ms}
+.gauge i:nth-child(5){height:47px;transition-delay:280ms}.gauge i:nth-child(6){height:56px;transition-delay:350ms}
+
+/* ================= 9. Widget pop-in + nudge (enter, then rare delight) ================= */
+.sitecard{position:relative;width:320px;height:180px;background:var(--sidebar);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px}
+.skl{height:8px;border-radius:4px;background:var(--border);margin-bottom:8px}
+.wbubble{position:absolute;right:14px;bottom:14px;width:46px;height:46px;border-radius:99px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;
+  opacity:0;transform:translateY(12px) scale(.9)}
+.wbubble.show{opacity:1;transform:none;transition:opacity var(--dur-4) var(--out-quart),transform var(--dur-4) var(--out-quart)}
+.wbubble.nudge{animation:nudge 500ms var(--out-quart) 1}
+@keyframes nudge{0%{transform:none}35%{transform:translateY(-5px)}70%{transform:translateY(1px)}100%{transform:none}}
+.wpreview{position:absolute;right:14px;bottom:70px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:10px 12px;font-size:11.5px;color:var(--text-2);box-shadow:0 8px 24px rgba(26,23,20,.08);
+  opacity:0;transform:translateY(8px) scale(.97);transform-origin:bottom right}
+.wpreview.show{opacity:1;transform:none;transition:opacity var(--dur-3) var(--out-quart),transform var(--dur-3) var(--out-quart)}
+
+/* ================= 10. Accordion (morph · grid rows trick) ================= */
+.acc{border:1px solid var(--border);border-radius:var(--r);background:var(--card);overflow:hidden}
+.acc button{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;box-sizing:border-box;padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.acc button:hover{background:var(--accent-subtle);transition:background 150ms ease}
+.acc .sign{transition:transform var(--dur-3) var(--inout-cubic);font-weight:700;color:var(--text-3)}
+.acc.open .sign{transform:rotate(45deg)}
+.acc .body{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur-3) var(--inout-cubic)}
+.acc.open .body{grid-template-rows:1fr}
+.acc .inner{overflow:hidden}
+.acc .inner p{padding:0 16px 14px;font-size:12px;color:var(--text-2);line-height:1.6}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header style="text-align:center">
+  <h1>Zenno · Motion Kit</h1>
+  <p class="hint">Drop-in animated components — Zenno tokens, transform/opacity only, reduced-motion safe</p>
+</header>
+
+<section>
+  <div class="label">01 · SCROLL REVEAL + BUTTONS</div>
+  <div class="row">
+    <div class="card reveal"><b>Reveals on scroll</b><p class="hint">500ms · ease-out-quart · 14px rise</p></div>
+    <div class="card reveal" data-d="1"><b>Staggered +80ms</b><p class="hint">siblings cascade</p></div>
+    <div class="card reveal" data-d="2"><b>Once only</b><p class="hint">never re-triggers</p></div>
+  </div>
+  <div class="row reveal" data-d="3">
+    <button class="btn">Get started free <span class="arrow">→</span></button>
+    <button class="btn ghost">See it book a class</button>
+  </div>
+</section>
+
+<section>
+  <div class="label">02 · CHAT AUTO-PLAY (hero)</div>
+  <div class="row">
+    <div class="chat" id="chat">
+      <div class="chat-head"><span class="cdot"></span> Lotus Yoga · WhatsApp</div>
+      <div class="msg me">Any free yoga slots this Saturday?</div>
+      <div class="typing"><i></i><i></i><i></i></div>
+      <div class="msg bot">Yes! Weekend Workshop, Sat 10:00 with Mali — 8 spots left. Want one?</div>
+      <div class="msg me">Book me in 🙌</div>
+      <div class="msg bot">You're in! See you Saturday.<br/><span class="booked">● Booked · Sat 10:00</span></div>
+    </div>
+    <div class="card" style="max-width:280px"><b>Sequence</b><p class="hint" style="margin-top:8px;line-height:1.7">
+      Each bubble: 300ms ease-out-quart enter.<br/>Typing dots: linear pulse between turns.<br/>Booked chip: scale pop after final message.<br/>Loops with a 3s rest. Pauses off-screen.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="label">03 · COUNT-UP STATS</div>
+  <div class="row">
+    <div class="card stat dark"><b data-count="38">0</b><span>bookings this week</span></div>
+    <div class="card stat"><b data-count="9" data-suffix=" sec">0</b><span>median first reply</span></div>
+    <div class="card stat"><b data-count="71" data-suffix="%">0</b><span>handled end-to-end</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="label">04 · CHANNEL MARQUEE (linear · pauses on hover)</div>
+  <div class="marquee"><div class="marquee-track" id="mq"></div></div>
+</section>
+
+<section>
+  <div class="label">05 · QR SCAN → CONNECTED</div>
+  <div class="card qrwrap" id="qr">
+    <div class="qrbox"><div class="qrgrid" id="qrgrid"></div><div class="scanline"></div>
+      <div class="qrcheck"><b>✓</b></div></div>
+    <div>
+      <b style="font-size:14px">Your number. Your WhatsApp.</b>
+      <p class="qrstate" style="margin-top:6px"><span class="waiting">Waiting for scan…</span><span class="ok">Connected as +49 176 •••</span></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="label">06 · BOOKING SLOT FILL + WARM-UP GAUGE</div>
+  <div class="row">
+    <div class="card"><p class="hint" style="margin-bottom:10px">Agent books → slot confirms</p><div class="cal" id="cal"></div></div>
+    <div class="card"><p class="hint" style="margin-bottom:10px">Warm-up: 20 → 200 msgs/day</p><div class="gauge" id="gauge"><i></i><i></i><i></i><i></i><i class="idle"></i><i class="idle"></i></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="label">07 · WIDGET POP-IN</div>
+  <div class="sitecard" id="site">
+    <div class="skl" style="width:55%"></div><div class="skl" style="width:80%"></div><div class="skl" style="width:70%"></div>
+    <div class="wpreview" id="wprev">Hi! Want to book a visit? 👋</div>
+    <div class="wbubble" id="wbub">💬</div>
+  </div>
+</section>
+
+<section>
+  <div class="label">08 · FAQ ACCORDION</div>
+  <div class="acc open" onclick="this.classList.toggle('open')">
+    <button>Will WhatsApp ban my number? <span class="sign">＋</span></button>
+    <div class="body"><div class="inner"><p>Zenno warms your number up automatically — daily limits start small and grow with the number's age, and replies to customers who message you first are the safest traffic there is.</p></div></div>
+  </div>
+  <div class="acc" onclick="this.classList.toggle('open')">
+    <button>Can I take over a conversation? <span class="sign">＋</span></button>
+    <div class="body"><div class="inner"><p>Any time. The moment you type, the AI pauses for that contact and hands the thread to you.</p></div></div>
+  </div>
+</section>
+
+<script>
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Scroll reveal — once */
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+}), { threshold: .25 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* Chat auto-play — loops while visible */
+(function(){
+  const chat = document.getElementById('chat');
+  const msgs = [...chat.querySelectorAll('.msg')];
+  const typing = chat.querySelector('.typing');
+  const booked = chat.querySelector('.booked');
+  let playing = false;
+  const wait = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
+  async function play(){
+    if (playing) return; playing = true;
+    while (chat.dataset.visible === '1') {
+      msgs.forEach(m => m.classList.remove('show')); booked.classList.remove('show');
+      await wait(500);
+      msgs[0].classList.add('show'); await wait(700);
+      typing.classList.add('on'); await wait(1100); typing.classList.remove('on');
+      msgs[1].classList.add('show'); await wait(1300);
+      msgs[2].classList.add('show'); await wait(900);
+      typing.classList.add('on'); await wait(900); typing.classList.remove('on');
+      msgs[3].classList.add('show'); await wait(400);
+      booked.classList.add('show');
+      await wait(3200);
+      if (reduced) break;
+    }
+    playing = false;
+  }
+  new IntersectionObserver(es => es.forEach(e => {
+    chat.dataset.visible = e.isIntersecting ? '1' : '0';
+    if (e.isIntersecting) play();
+  }), { threshold: .4 }).observe(chat);
+})();
+
+/* Count-up — rAF with ease-out cubic */
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+document.querySelectorAll('[data-count]').forEach(el => {
+  new IntersectionObserver((es, ob) => es.forEach(e => {
+    if (!e.isIntersecting || el.dataset.done) return;
+    el.dataset.done = '1';
+    const end = +el.dataset.count, suf = el.dataset.suffix || '';
+    const t0 = performance.now(), D = reduced ? 1 : 1100;
+    (function tick(now){
+      const p = Math.min(1, (now - t0) / D);
+      el.textContent = Math.round(end * easeOut(p)) + suf;
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+    ob.unobserve(el);
+  }), { threshold: .6 }).observe(el);
+});
+
+/* Marquee chips ×2 for seamless loop */
+(function(){
+  const data = [['WhatsApp','var(--wa)'],['Telegram','var(--tg)'],['LINE','var(--ln)'],['Messenger','var(--ms)'],['Web chat','var(--wc)'],['Instagram','var(--ig)']];
+  const track = document.getElementById('mq');
+  for (let k = 0; k < 2; k++) data.forEach(([n,c]) => {
+    const s = document.createElement('span'); s.className = 'chip';
+    s.innerHTML = `<i style="background:${c}"></i>${n}`; track.appendChild(s);
+  });
+})();
+
+/* QR grid + scan-to-connected sequence */
+(function(){
+  const grid = document.getElementById('qrgrid');
+  for (let i = 0; i < 36; i++) { const d = document.createElement('i'); if ((i * 7) % 3 === 0) d.className = 'o'; grid.appendChild(d); }
+  const wrap = document.getElementById('qr'), box = wrap.querySelector('.qrbox');
+  new IntersectionObserver((es, ob) => es.forEach(e => {
+    if (!e.isIntersecting) return; ob.unobserve(wrap);
+    setTimeout(() => { box.classList.add('done'); wrap.classList.add('done'); }, reduced ? 0 : 3200);
+  }), { threshold: .5 }).observe(wrap);
+})();
+
+/* Calendar slot fill */
+(function(){
+  const cal = document.getElementById('cal');
+  for (let i = 0; i < 12; i++) { const d = document.createElement('i'); if (i === 6) d.className = 'target'; cal.appendChild(d); }
+  new IntersectionObserver((es, ob) => es.forEach(e => {
+    if (!e.isIntersecting) return; ob.unobserve(cal);
+    setTimeout(() => cal.querySelector('.target').classList.add('fill'), reduced ? 0 : 900);
+  }), { threshold: .5 }).observe(cal);
+})();
+
+/* Warm-up gauge */
+(function(){
+  const g = document.getElementById('gauge');
+  new IntersectionObserver((es, ob) => es.forEach(e => {
+    if (e.isIntersecting) { g.classList.add('go'); ob.unobserve(g); }
+  }), { threshold: .5 }).observe(g);
+})();
+
+/* Widget pop-in, preview, occasional nudge */
+(function(){
+  const bub = document.getElementById('wbub'), prev = document.getElementById('wprev');
+  new IntersectionObserver((es, ob) => es.forEach(e => {
+    if (!e.isIntersecting) return; ob.unobserve(document.getElementById('site'));
+    setTimeout(() => bub.classList.add('show'), reduced ? 0 : 500);
+    setTimeout(() => prev.classList.add('show'), reduced ? 0 : 1400);
+    if (!reduced) setInterval(() => { bub.classList.remove('nudge'); void bub.offsetWidth; bub.classList.add('nudge'); }, 6000);
+  }), { threshold: .5 }).observe(document.getElementById('site'));
+})();
+</script>
+</body>
+</html>
