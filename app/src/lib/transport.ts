@@ -2,17 +2,20 @@ import { IS_MOCK } from './mock-store'
 import { connectDb } from './db'
 import { sendWhatsApp } from './channels/whatsapp'
 import { sendInstagram } from './channels/instagram'
-import { sendLine } from './channels/line'
+import { sendLine, sendLinePush } from './channels/line'
+import { sendTelegram } from './channels/telegram'
+import { sendMessenger } from './channels/messenger'
 import { isGatewayConfigured, sendGatewayText } from './channels/wa-gateway'
 import { tryReserveSend, type SendKind } from './send-limits'
 import { ChannelConnection, type IChannelConnection } from '@/models/ChannelConnection'
 
 /**
- * Unified outbound delivery. WhatsApp prefers the workspace's own
- * gateway-connected number (user scanned a QR — subject to warm-up quotas);
- * env-configured provider keys are the fallback. Missing credentials or
- * provider errors never throw — the message is already persisted; delivery
- * is best-effort and reported.
+ * Unified outbound delivery. Each channel prefers the workspace's own
+ * stored connection (QR-linked WhatsApp, Telegram bot, LINE channel,
+ * Messenger page); env-configured provider keys are the single-tenant
+ * fallback where one exists. Missing credentials or provider errors never
+ * throw — the message is already persisted; delivery is best-effort and
+ * reported.
  */
 
 export interface DeliveryResult {
@@ -37,22 +40,25 @@ export function isChannelConfigured(channel: string): boolean {
   return required.every((key) => Boolean(process.env[key]))
 }
 
-async function findGatewayConnection(
+async function findConnection(
   workspaceId: string,
+  channel: string,
 ): Promise<IChannelConnection | null> {
-  if (!isGatewayConfigured()) return null
   try {
     await connectDb()
-    return await ChannelConnection.findOne({
-      workspaceId,
-      channel: 'whatsapp',
-      status: 'connected',
-    })
+    return await ChannelConnection.findOne({ workspaceId, channel, status: 'connected' })
   } catch (error: unknown) {
-    console.error('[transport] gateway connection lookup failed:', error)
+    console.error(`[transport] ${channel} connection lookup failed:`, error)
     return null
   }
 }
+
+const NOT_CONNECTED = (channel: string): DeliveryResult => ({
+  delivered: false,
+  reason: `${channel} channel is not connected`,
+})
+
+const DELIVERED: DeliveryResult = { delivered: true, reason: null }
 
 export async function deliverMessage(
   workspaceId: string,
@@ -64,28 +70,67 @@ export async function deliverMessage(
   if (IS_MOCK) return { delivered: false, reason: 'Mock mode — nothing is transmitted' }
 
   try {
-    if (channel === 'whatsapp') {
-      const conn = await findGatewayConnection(workspaceId)
-      if (conn) {
-        const reservation = await tryReserveSend(conn, options.kind ?? 'reply')
-        if (!reservation.ok) return { delivered: false, reason: reservation.reason }
-        await sendGatewayText(conn.instanceName, externalContactId, text)
-        return { delivered: true, reason: null }
+    switch (channel) {
+      case 'whatsapp': {
+        if (isGatewayConfigured()) {
+          const conn = await findConnection(workspaceId, 'whatsapp')
+          if (conn) {
+            const reservation = await tryReserveSend(conn, options.kind ?? 'reply')
+            if (!reservation.ok) return { delivered: false, reason: reservation.reason }
+            await sendGatewayText(conn.instanceName, externalContactId, text)
+            return DELIVERED
+          }
+        }
+        if (isChannelConfigured('whatsapp')) {
+          await sendWhatsApp(externalContactId, text)
+          return DELIVERED
+        }
+        return NOT_CONNECTED('whatsapp')
       }
-      if (isChannelConfigured('whatsapp')) {
-        await sendWhatsApp(externalContactId, text)
-        return { delivered: true, reason: null }
-      }
-      return { delivered: false, reason: 'whatsapp channel is not connected' }
-    }
 
-    if (!isChannelConfigured(channel)) {
-      return { delivered: false, reason: `${channel} channel is not connected` }
+      case 'telegram': {
+        const conn = await findConnection(workspaceId, 'telegram')
+        const botToken = conn?.credentials?.botToken
+        if (!botToken) return NOT_CONNECTED('telegram')
+        await sendTelegram(botToken, externalContactId, text)
+        return DELIVERED
+      }
+
+      case 'line': {
+        const conn = await findConnection(workspaceId, 'line')
+        const accessToken = conn?.credentials?.channelAccessToken
+        if (accessToken) {
+          await sendLinePush(accessToken, externalContactId, text)
+          return DELIVERED
+        }
+        if (isChannelConfigured('line')) {
+          await sendLine(externalContactId, text)
+          return DELIVERED
+        }
+        return NOT_CONNECTED('line')
+      }
+
+      case 'messenger': {
+        const conn = await findConnection(workspaceId, 'messenger')
+        const pageToken = conn?.credentials?.pageAccessToken
+        if (!pageToken) return NOT_CONNECTED('messenger')
+        await sendMessenger(pageToken, externalContactId, text)
+        return DELIVERED
+      }
+
+      case 'instagram': {
+        if (!isChannelConfigured('instagram')) return NOT_CONNECTED('instagram')
+        await sendInstagram(externalContactId, text)
+        return DELIVERED
+      }
+
+      case 'webchat':
+        // The stored message IS the delivery — the widget polls for it.
+        return DELIVERED
+
+      default:
+        return { delivered: false, reason: `No sender for channel: ${channel}` }
     }
-    if (channel === 'instagram') await sendInstagram(externalContactId, text)
-    else if (channel === 'line') await sendLine(externalContactId, text)
-    else return { delivered: false, reason: `No sender for channel: ${channel}` }
-    return { delivered: true, reason: null }
   } catch (error: unknown) {
     const reason = error instanceof Error ? error.message : 'Delivery failed'
     console.error(`[transport] ${channel} delivery failed:`, error)

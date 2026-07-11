@@ -62,6 +62,8 @@ const CHANNEL_COLORS: Record<Channel, string> = {
   whatsapp:  'var(--channel-whatsapp, #25D366)',
   instagram: 'var(--channel-instagram, #E1306C)',
   line:      'var(--channel-line, #00C300)',
+  telegram:  'var(--channel-telegram, #26A5E4)',
+  messenger: 'var(--channel-messenger, #0084FF)',
   webchat:   'var(--channel-webchat, #3B82F6)',
   sms:       '#6B7280',
   email:     '#6B7280',

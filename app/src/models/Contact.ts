@@ -24,7 +24,7 @@ const ContactSchema = new Schema<IContact>(
   {
     workspaceId:      { type: String, required: true, index: true },
     externalId:       { type: String, required: true },
-    channel:          { type: String, required: true, enum: ['whatsapp','instagram','line','webchat','sms','email'] },
+    channel:          { type: String, required: true, enum: ['whatsapp','instagram','messenger','telegram','line','webchat','sms','email'] },
     name:             { type: String, default: null },
     phone:            { type: String, default: null },
     instagramHandle:  { type: String, default: null },

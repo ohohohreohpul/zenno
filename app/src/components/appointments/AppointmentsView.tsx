@@ -30,6 +30,9 @@ const CHANNEL_COLORS: Record<Channel, string> = {
   whatsapp: '#25D366',
   instagram: '#E1306C',
   line: '#00B900',
+  telegram: '#26A5E4',
+  messenger: '#0084FF',
+  webchat: '#6366F1',
 }
 
 function formatHour(h: number) {

@@ -15,7 +15,9 @@ const STAGE_COLORS: Record<string, string> = {
 }
 const CHANNEL_COLORS: Record<string, string> = {
   whatsapp: 'var(--channel-whatsapp)', instagram: 'var(--channel-instagram)',
-  line: 'var(--channel-line)', webchat: 'var(--channel-webchat)',
+  line: 'var(--channel-line)',
+  telegram: 'var(--channel-telegram)',
+  messenger: 'var(--channel-messenger)', webchat: 'var(--channel-webchat)',
 }
 
 interface AnalyticsData {

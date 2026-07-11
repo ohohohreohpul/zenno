@@ -3,6 +3,8 @@ import type { Channel } from '@/types'
 const CHANNEL_META: Record<Channel, { label: string; color: string }> = {
   whatsapp:  { label: 'WA',  color: 'var(--channel-whatsapp)' },
   instagram: { label: 'IG',  color: 'var(--channel-instagram)' },
+  messenger: { label: 'MSG', color: 'var(--channel-messenger)' },
+  telegram:  { label: 'TG',  color: 'var(--channel-telegram)' },
   line:      { label: 'LINE',color: 'var(--channel-line)' },
   webchat:   { label: 'Web', color: 'var(--channel-webchat)' },
   sms:       { label: 'SMS', color: '#6B7280' },

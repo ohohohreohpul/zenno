@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Check, AlertCircle, ExternalLink } from 'lucide-react'
 import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './GuardrailsSection'
 import { WhatsAppConnectCard } from './WhatsAppConnectCard'
+import { CredentialChannelCard, type ChannelCardConfig } from './CredentialChannelCard'
+import { WebchatCard } from './WebchatCard'
 
 const CHANNELS = [
   {
@@ -18,19 +20,47 @@ const CHANNELS = [
     docsUrl: 'https://developers.facebook.com/docs/messenger-platform/',
     connected: false,
   },
-  {
-    id: 'line',
-    name: 'LINE',
-    description: 'LINE Messaging API',
-    color: 'var(--channel-line)',
-    fields: [
-      { key: 'channel_secret', label: 'Channel Secret', placeholder: 'xxxx', type: 'password' },
-      { key: 'channel_access_token', label: 'Channel Access Token', placeholder: 'xxxx', type: 'password' },
-    ],
-    docsUrl: 'https://developers.line.biz/en/docs/messaging-api/',
-    connected: false,
-  },
 ]
+
+const TELEGRAM_CONFIG: ChannelCardConfig = {
+  id: 'telegram',
+  name: 'Telegram',
+  color: 'var(--channel-telegram)',
+  description: 'Create a bot with @BotFather and paste the token — connected in seconds',
+  endpoint: '/api/channels/telegram',
+  fields: [
+    { key: 'bot_token', label: 'Bot token', placeholder: '123456789:AAF...', type: 'password' },
+  ],
+  helpText: 'In Telegram: message @BotFather → /newbot → copy the token.',
+  docsUrl: 'https://core.telegram.org/bots#how-do-i-create-a-bot',
+}
+
+const LINE_CONFIG: ChannelCardConfig = {
+  id: 'line',
+  name: 'LINE',
+  color: 'var(--channel-line)',
+  description: 'Messaging API channel — paste the secret and access token from the LINE Developers console',
+  endpoint: '/api/channels/line',
+  fields: [
+    { key: 'channel_secret', label: 'Channel secret', placeholder: 'xxxx', type: 'password' },
+    { key: 'channel_access_token', label: 'Channel access token', placeholder: 'xxxx', type: 'password' },
+  ],
+  helpText: 'After connecting, set the webhook URL shown here in the LINE console.',
+  docsUrl: 'https://developers.line.biz/en/docs/messaging-api/',
+}
+
+const MESSENGER_CONFIG: ChannelCardConfig = {
+  id: 'messenger',
+  name: 'Facebook Messenger',
+  color: 'var(--channel-messenger)',
+  description: 'Paste a Page access token from your Meta app — inbound events route by page automatically',
+  endpoint: '/api/channels/messenger',
+  fields: [
+    { key: 'page_access_token', label: 'Page access token', placeholder: 'EAAxxxx', type: 'password' },
+  ],
+  helpText: 'After connecting, add the webhook URL + verify token shown here in the Meta app dashboard (messages subscription).',
+  docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',
+}
 
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<'channels' | 'ai' | 'workspace'>('ai')
@@ -166,6 +196,10 @@ export function SettingsView() {
         {activeTab === 'channels' && (
           <div style={{ maxWidth: 680, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WhatsAppConnectCard />
+            <WebchatCard />
+            <CredentialChannelCard config={TELEGRAM_CONFIG} />
+            <CredentialChannelCard config={LINE_CONFIG} />
+            <CredentialChannelCard config={MESSENGER_CONFIG} />
             {CHANNELS.map((ch) => (
               <ChannelCard key={ch.id} channel={ch} />
             ))}

@@ -1,21 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyLineSignature, sendLine } from '@/lib/channels/line'
+import { verifyLineSignature, verifyLineSignatureWith } from '@/lib/channels/line'
 import { handleIncoming } from '@/lib/conversation'
+import { connectDb } from '@/lib/db'
+import { workspaceIdFrom } from '@/lib/channels/connection-helpers'
+import { ChannelConnection } from '@/models/ChannelConnection'
 import type { IncomingMessage } from '@/types'
 
-const WORKSPACE_ID_HEADER = 'x-workspace-id'
+/**
+ * LINE webhook. Registered per workspace as /api/webhooks/line?workspaceId=…
+ * (set this URL in the LINE Developers console). Signature is verified with
+ * the workspace's stored channel secret, falling back to the env secret.
+ * Contacts are keyed by LINE userId; replies go out via the Push API.
+ */
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = await req.text()
   const signature = req.headers.get('x-line-signature') ?? ''
+  const workspaceId = req.headers.get('x-workspace-id') ?? workspaceIdFrom(req)
 
-  if (!verifyLineSignature(rawBody, signature)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  let verified = false
+  try {
+    await connectDb()
+    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'line' }).lean()
+    const secret = conn?.credentials?.channelSecret
+    if (secret) verified = verifyLineSignatureWith(secret, rawBody, signature)
+  } catch (error: unknown) {
+    console.error('[webhook:line] connection lookup failed:', error)
   }
-
-  const workspaceId = req.headers.get(WORKSPACE_ID_HEADER)
-  if (!workspaceId) {
-    return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 })
+  if (!verified) verified = verifyLineSignature(rawBody, signature)
+  if (!verified) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   let payload: unknown
@@ -25,46 +39,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { messages, replyTokens } = extractLineMessages(payload)
+  const messages = extractLineMessages(payload)
 
-  await Promise.all(
-    messages.map((msg, i) =>
-      handleIncomingLine(workspaceId, msg, replyTokens[i]),
-    ),
-  )
+  for (const msg of messages) {
+    try {
+      await handleIncoming(workspaceId, msg)
+    } catch (error: unknown) {
+      console.error('[webhook:line] message handling failed:', error)
+    }
+  }
 
   return NextResponse.json({ status: 'ok' })
 }
 
-async function handleIncomingLine(
-  workspaceId: string,
-  incoming: IncomingMessage,
-  replyToken: string,
-): Promise<void> {
-  // LINE uses reply tokens, not user IDs for sending — store replyToken as external_contact_id
-  // The LINE push API (sendLine) accepts replyToken directly
-  await handleIncoming(workspaceId, { ...incoming, external_contact_id: replyToken })
+interface LineEvent {
+  type?: string
+  replyToken?: string
+  source?: { userId?: string }
+  message?: { type?: string; text?: string }
 }
 
-function extractLineMessages(payload: unknown): {
-  messages: IncomingMessage[]
-  replyTokens: string[]
-} {
+function extractLineMessages(payload: unknown): IncomingMessage[] {
+  const events = ((payload as { events?: LineEvent[] })?.events ?? [])
   const messages: IncomingMessage[] = []
-  const replyTokens: string[] = []
 
-  for (const event of (payload as any)?.events ?? []) {
+  for (const event of events) {
     if (event.type !== 'message' || event.message?.type !== 'text') continue
+    const userId = event.source?.userId
+    const text = event.message.text
+    if (!userId || !text) continue
 
     messages.push({
       channel: 'line',
-      external_contact_id: event.source?.userId ?? event.replyToken,
+      external_contact_id: userId,
       contact_name: null,
-      content: event.message.text,
+      content: text,
       raw: event,
     })
-    replyTokens.push(event.replyToken)
   }
 
-  return { messages, replyTokens }
+  return messages
 }

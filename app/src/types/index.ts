@@ -1,4 +1,4 @@
-export type Channel = 'whatsapp' | 'instagram' | 'line' | 'webchat' | 'sms' | 'email'
+export type Channel = 'whatsapp' | 'instagram' | 'messenger' | 'telegram' | 'line' | 'webchat' | 'sms' | 'email'
 
 export type LifecycleStage =
   | 'inquiry'
