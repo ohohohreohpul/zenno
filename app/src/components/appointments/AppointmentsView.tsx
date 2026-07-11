@@ -10,7 +10,7 @@ const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) =
 const SLOT_HEIGHT = 56 // px per hour
 const WORKSPACE_ID = 'ws-1'
 
-type Channel = 'whatsapp' | 'instagram' | 'line'
+type Channel = 'whatsapp' | 'instagram' | 'messenger' | 'telegram' | 'line' | 'webchat'
 type AppointmentKind = 'trial' | 'regular' | 'consult'
 
 interface Appointment {
