@@ -1,0 +1,72 @@
+.grid {
+  margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.card {
+  padding: 28px;
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: transform 0.5s var(--ease-out-expo), box-shadow 0.5s var(--ease-out-expo);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh);
+}
+.card blockquote {
+  margin: 0;
+  font-size: 1.12rem;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+.card blockquote::before {
+  content: '“';
+  display: block;
+  font-size: 2.6rem;
+  line-height: 0.5;
+  color: var(--line-strong);
+  margin-bottom: 12px;
+}
+.card figcaption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  flex: none;
+}
+.card figcaption strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.card figcaption em {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: var(--t3);
+}
+.disclaimer {
+  margin-top: 24px;
+  text-align: center;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.68rem;
+  color: var(--t3);
+}
+
+@media (max-width: 820px) {
+  .grid {
+    grid-template-columns: 1fr;
+    max-width: 460px;
+    margin-inline: auto;
+  }
+}

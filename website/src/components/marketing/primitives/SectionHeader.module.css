@@ -1,0 +1,18 @@
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 46rem;
+}
+.center {
+  align-items: center;
+  text-align: center;
+  margin-inline: auto;
+}
+.center .lead {
+  margin-inline: auto;
+}
+.lead {
+  max-width: 44ch;
+  margin: 0;
+}

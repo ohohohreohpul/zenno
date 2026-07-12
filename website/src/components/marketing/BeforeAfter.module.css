@@ -1,0 +1,137 @@
+.split {
+  margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.side {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  min-height: 320px;
+  display: flex;
+}
+.bgImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scrim {
+  position: absolute;
+  inset: 0;
+}
+.before .scrim {
+  background: linear-gradient(0deg, rgba(8, 8, 10, 0.92) 0%, rgba(8, 8, 10, 0.5) 55%, rgba(8, 8, 10, 0.35) 100%);
+}
+.after .scrim {
+  background: linear-gradient(0deg, rgba(10, 8, 6, 0.82) 0%, rgba(10, 8, 6, 0.28) 55%, rgba(10, 8, 6, 0.15) 100%);
+}
+.before,
+.after {
+  color: var(--inv);
+  box-shadow: var(--sh-lg);
+}
+.content {
+  position: relative;
+  z-index: 1;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+.tag {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--inv-2);
+}
+.time {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--inv-2);
+}
+.after .time {
+  color: color-mix(in srgb, var(--green) 70%, #fff);
+}
+.msg {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.silence {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
+}
+.dots {
+  font-size: 1.4rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.3);
+}
+.booked {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(5, 150, 105, 0.16);
+  color: #6ee7b7;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.roi {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 32px;
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--line-strong);
+  background: var(--card);
+}
+.roiNum {
+  font-size: clamp(2.2rem, 1.6rem + 2.5vw, 3.4rem);
+  font-weight: 640;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--green);
+  white-space: nowrap;
+}
+.roiText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.roiText strong {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.roiText span {
+  color: var(--t2);
+  font-size: 0.92rem;
+  max-width: 46ch;
+}
+
+@media (max-width: 720px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .roi {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

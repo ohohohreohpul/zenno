@@ -1,0 +1,4 @@
+.hero {
+  padding-top: clamp(8rem, 6rem + 6vw, 11rem);
+  padding-bottom: clamp(1.5rem, 1rem + 2vw, 3rem);
+}

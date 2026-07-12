@@ -1,0 +1,96 @@
+.steps {
+  position: relative;
+  margin-top: clamp(3rem, 2rem + 3vw, 5rem);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.5rem, 1rem + 2vw, 3rem);
+}
+.track,
+.progress {
+  position: absolute;
+  top: 22px;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 999px;
+  transform-origin: left;
+}
+.track {
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+.progress {
+  background: var(--ink);
+  transform: scaleX(0);
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding-top: 60px;
+}
+.node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--t1);
+  box-shadow: 0 0 0 6px var(--bg);
+}
+.title {
+  font-size: var(--step-2);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.body {
+  color: var(--t2);
+  margin: 0;
+  max-width: 34ch;
+  font-size: 0.98rem;
+}
+.tag {
+  margin-top: 0.3rem;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--t3);
+}
+
+@media (max-width: 760px) {
+  .steps {
+    grid-template-columns: 1fr;
+    gap: 2.4rem;
+  }
+  .track,
+  .progress {
+    top: 0;
+    bottom: 0;
+    left: 22px;
+    right: auto;
+    width: 2px;
+    height: auto;
+    transform-origin: top;
+  }
+  .progress {
+    transform: scaleY(0);
+  }
+  .step {
+    padding-top: 0;
+    padding-left: 70px;
+  }
+  .node {
+    box-shadow: 0 0 0 6px var(--bg);
+  }
+}

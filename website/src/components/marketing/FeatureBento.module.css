@@ -1,0 +1,102 @@
+.grid {
+  margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, minmax(150px, auto));
+  grid-template-areas:
+    'bookings bookings broadcast'
+    'inbox handoff broadcast'
+    'warmup lifecycle lifecycle';
+  gap: 14px;
+}
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 26px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: transform 0.55s var(--ease-out-expo), box-shadow 0.55s var(--ease-out-expo),
+    border-color 0.3s ease;
+}
+.cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 100% at 100% 0%, var(--subtle), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.cell:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh);
+  border-color: var(--line-strong);
+}
+.cell:hover::after {
+  opacity: 1;
+}
+.glyph {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--bg-warm);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+}
+.glyph svg {
+  width: 22px;
+  height: 22px;
+}
+
+.text {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+/* cells with a live widget put the widget at the bottom instead of the text block */
+.cell:has(.widgetSlot) .text {
+  margin-top: 0;
+}
+.widgetSlot {
+  margin-top: auto;
+}
+.text h3 {
+  font-size: 1.22rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.text p {
+  margin: 0;
+  color: var(--t2);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 40ch;
+}
+
+.tag {
+  align-self: flex-start;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--green);
+  background: var(--green-soft);
+  padding: 5px 11px;
+  border-radius: 999px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: none;
+  }
+  .cell {
+    grid-area: auto !important;
+  }
+}

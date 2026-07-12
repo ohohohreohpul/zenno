@@ -1,0 +1,43 @@
+/* No Tailwind here — the marketing site doesn't use utility classes, only the
+   scoped `.zx` design system in styles/marketing.css. This file is just the
+   document-level reset plus the 3 layout utility classes layout.tsx needs. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.min-h-full {
+  min-height: 100%;
+}
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d3cb;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a09990;
+}

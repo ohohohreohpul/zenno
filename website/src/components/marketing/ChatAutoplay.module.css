@@ -1,0 +1,121 @@
+.chat {
+  width: 100%;
+  max-width: 380px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--r-xl);
+  background: var(--card);
+  box-shadow: var(--sh-lg);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.head strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  display: block;
+  letter-spacing: -0.01em;
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--bg-warm);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.chDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--wa);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wa) 22%, transparent);
+}
+.chan {
+  font-size: 0.72rem;
+  color: var(--green);
+  font-weight: 500;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 268px;
+}
+
+.bubble {
+  max-width: 84%;
+  padding: 10px 13px;
+  border-radius: 16px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.me {
+  align-self: flex-end;
+  background: var(--ink);
+  color: var(--inv);
+  border-bottom-right-radius: 5px;
+}
+.bot {
+  align-self: flex-start;
+  background: var(--bg-warm);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 5px;
+}
+
+.booked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--green);
+}
+.bookDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 12px 14px;
+}
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--t3);
+  animation: tp 1s linear infinite;
+}
+.typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes tp {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}

@@ -1,0 +1,143 @@
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  transition: transform 0.4s var(--ease-out-expo);
+}
+.inner {
+  width: min(100% - calc(var(--gutter) * 2), 1400px);
+  margin: 12px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 12px 10px 20px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background 0.4s var(--ease-out-expo), border-color 0.4s var(--ease-out-expo),
+    box-shadow 0.4s var(--ease-out-expo), backdrop-filter 0.4s ease;
+}
+.scrolled .inner {
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border-color: var(--line);
+  box-shadow: var(--sh);
+}
+
+/* default state sits over the hero photo — light text; scrolled state sits over
+   the cream page — ink text. Both transition together with the pill background. */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 640;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+  color: #fff;
+  text-decoration: none;
+  transition: color 0.4s var(--ease-out-expo);
+}
+.scrolled .logo {
+  color: var(--t1);
+}
+.mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  position: relative;
+}
+.mark::after {
+  content: '';
+  position: absolute;
+  inset: 6px 6px auto auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.links {
+  display: flex;
+  gap: 4px;
+}
+.link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.scrolled .link {
+  color: var(--t2);
+}
+.scrolled .link:hover {
+  color: var(--t1);
+  background: var(--subtle);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.langSwitch {
+  padding: 8px 10px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.langSwitch:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.scrolled .langSwitch {
+  color: var(--t2);
+  border-color: var(--line-strong);
+}
+.scrolled .langSwitch:hover {
+  color: var(--t1);
+  background: var(--subtle);
+}
+.signin {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.signin:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.scrolled .signin {
+  color: var(--t1);
+}
+.scrolled .signin:hover {
+  background: var(--subtle);
+}
+
+@media (max-width: 860px) {
+  .links {
+    display: none;
+  }
+  .signin {
+    display: none;
+  }
+}

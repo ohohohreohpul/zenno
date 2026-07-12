@@ -1,0 +1,19 @@
+.layout {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  align-items: start;
+}
+.left {
+  position: sticky;
+  top: 110px;
+}
+
+@media (max-width: 820px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .left {
+    position: static;
+  }
+}

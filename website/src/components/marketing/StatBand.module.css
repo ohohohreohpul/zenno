@@ -1,0 +1,104 @@
+.wrapOuter {
+  padding-block: clamp(2rem, 1rem + 3vw, 4rem);
+}
+.band {
+  position: relative;
+  background: var(--ink);
+  color: var(--inv);
+  border-radius: var(--r-2xl);
+  padding: clamp(2.2rem, 1.5rem + 3vw, 4rem);
+  overflow: hidden;
+  box-shadow: var(--sh-lg);
+}
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    60% 80% at 85% -10%,
+    color-mix(in srgb, var(--green) 22%, transparent),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.top {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-bottom: clamp(2rem, 1.2rem + 2vw, 3rem);
+}
+.kicker {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--inv-2);
+}
+.headline {
+  font-size: var(--step-4);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  margin: 0;
+  max-width: 16ch;
+}
+.bar {
+  display: block;
+  height: 3px;
+  width: min(320px, 60%);
+  background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 40%, transparent));
+  border-radius: 999px;
+  transform-origin: left;
+}
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: clamp(1rem, 0.5rem + 2vw, 2.5rem);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.num {
+  font-size: clamp(2.4rem, 1.6rem + 3vw, 4.4rem);
+  font-weight: 640;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+.hero .num {
+  color: #fff;
+}
+.hero .num {
+  background: linear-gradient(180deg, #fff, #d9f0e6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.label {
+  font-size: 0.85rem;
+  color: var(--inv-2);
+  line-height: 1.35;
+}
+
+.foot {
+  position: relative;
+  margin: clamp(1.6rem, 1rem + 1.5vw, 2.4rem) 0 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.4rem;
+  }
+}

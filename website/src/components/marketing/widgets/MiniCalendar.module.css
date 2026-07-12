@@ -1,0 +1,49 @@
+.wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-warm);
+  padding: 14px;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.headBooked {
+  color: var(--green);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-geist-mono), monospace;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.cell {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: var(--subtle);
+  display: grid;
+  place-items: center;
+  transition: background 0.3s ease;
+}
+.target.filled {
+  background: var(--green);
+}
+.check {
+  font-style: normal;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0;
+}
+.target.filled .check {
+  opacity: 1;
+}
