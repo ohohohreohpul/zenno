@@ -119,7 +119,7 @@ export function SignInPage({ mode, error, success, isSubmitting, onSubmit, onGoo
         <div className="absolute inset-0 auth-grid opacity-25" />
         <div className="absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-[#B59B7A]/25 blur-[110px]" />
         <div className="absolute -bottom-40 -left-28 h-[520px] w-[520px] rounded-full bg-[#6E7C62]/20 blur-[120px]" />
-        <Image src="/logo/Vector-2.svg" alt="" width={463} height={466} className="absolute -right-16 bottom-[-70px] w-[52%] max-w-[520px] rotate-[-8deg] opacity-[0.075]" />
+        <Image src="/logo/Vector-2.svg" alt="" width={463} height={466} priority className="absolute -right-16 bottom-[-70px] w-[52%] max-w-[520px] rotate-[-8deg] opacity-[0.075]" />
 
         <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
           <Image src="/logo/logowithtext-1.svg" alt="Zenno" width={180} height={50} className="h-auto w-[142px]" />
