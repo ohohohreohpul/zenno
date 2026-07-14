@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { IS_MOCK } from '@/lib/mock-store'
 import { getUserByEmail } from '@/lib/queries'
 import {
-  MOCK_DEMO_USER,
+  LOCAL_USER,
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
   createSessionToken,
@@ -20,9 +20,9 @@ const INVALID_CREDENTIALS = 'Invalid email or password'
 
 async function authenticate(email: string, password: string): Promise<SessionPayload | null> {
   if (IS_MOCK) {
-    const isMatch = email === MOCK_DEMO_USER.email && password === MOCK_DEMO_USER.password
+    const isMatch = email === LOCAL_USER.email && password === LOCAL_USER.password
     if (!isMatch) return null
-    return { userId: MOCK_DEMO_USER.userId, email: MOCK_DEMO_USER.email, name: MOCK_DEMO_USER.name }
+    return { userId: LOCAL_USER.userId, email: LOCAL_USER.email, name: LOCAL_USER.name }
   }
 
   const user = await getUserByEmail(email) as { id: string; email: string; passwordHash: string; name: string } | null

@@ -112,7 +112,7 @@ Setup wizard: paste the business website URL → Zenno scrapes it → generates 
 - "Their own WhatsApp. Not a rented number."
 - "AI answers. You stay in charge."
 - "Your next customer is typing right now." *(closing CTA)*
-- CTA labels: **Get started free** (primary) · **See it book a class** (secondary/demo)
+- CTA labels: **Get started free** (primary) · **See it book a class** (secondary)
 - Tone: direct, concrete, zero AI-hype words ("revolutionary", "supercharge" are banned). Every claim ties to a booking.
 
 ---
@@ -129,7 +129,7 @@ Setup wizard: paste the business website URL → Zenno scrapes it → generates 
 
 - **Wireframe kit (16 sections, low/mid-fi):** https://www.figma.com/design/w0Ofy4K0ZZikVFBeiHIuO1 — all auto-layout, built on the product tokens
 - **Motion kit (live, copy-paste animations):** https://zen-agent.vercel.app/motion-kit.html — 8 patterns, reduced-motion safe
-- **Product to screenshot / demo:** https://zen-agent.vercel.app — login `demo@studio.com` / `demo1234`
+- **Product:** https://zen-agent.vercel.app
 - **Design tokens** (from the product — the site must feel like the same family):
   - Background `#FDFCFA` · Card `#FFFFFF` · Sidebar `#F9F7F4`
   - Border `#EEEBE6` / strong `#D8D3CB`

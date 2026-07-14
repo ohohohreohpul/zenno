@@ -2,13 +2,11 @@
 
 Zenno is a 24/7 text chatbot for service businesses. It learns the business from its website, answers customer questions, qualifies leads, checks live availability, books appointments, remembers customer context, and hands sensitive conversations to a human.
 
-## Live demo
+## Live application
 
-Open [zen-agent.vercel.app](https://zen-agent.vercel.app) and sign in with `demo@studio.com` / `demo1234`.
+Open [zen-agent.vercel.app](https://zen-agent.vercel.app).
 
-The hosted demo runs with in-memory sample data so it can be used immediately. Before onboarding a real business, connect Supabase using the production steps below so conversations and configuration are durable.
-
-## Run the usable demo
+## Run locally
 
 ```bash
 cd app
@@ -18,12 +16,12 @@ npm install
 npm run dev
 ```
 
-Set `MOCK_MODE=true` for the self-contained demo. Log in with `demo@studio.com` / `demo1234`.
+For isolated local development, set `MOCK_MODE=true` and configure `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD`.
 
 ## Production setup
 
 1. Create the database by running [`app/supabase/schema.sql`](app/supabase/schema.sql) in the Supabase SQL editor.
-2. Configure `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_SECRET`, and one AI provider key from [`app/.env.example`](app/.env.example).
+2. Configure `NEXT_PUBLIC_SUPABASE_URL`, a supported Supabase server credential, `AUTH_SECRET`, and one AI provider key from [`app/.env.example`](app/.env.example).
 3. Seed the initial workspace:
 
 ```bash

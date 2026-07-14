@@ -165,19 +165,6 @@ function LoginForm() {
           </form>
         </section>
 
-        <div
-          style={{
-            marginTop: 20,
-            background: COLORS.accentSubtle,
-            borderRadius: 10,
-            padding: '12px 16px',
-            fontSize: 12,
-            color: COLORS.textSecondary,
-            textAlign: 'center',
-          }}
-        >
-          Demo access — demo@studio.com / demo1234
-        </div>
       </div>
     </main>
   )

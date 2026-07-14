@@ -2,10 +2,9 @@
 
 ## Current release status
 
-- Live demo: [zen-agent.vercel.app](https://zen-agent.vercel.app)
-- Demo login: `demo@studio.com` / `demo1234`
+- Live application: [zen-agent.vercel.app](https://zen-agent.vercel.app)
 - Verified live: authentication, protected APIs, dashboard data, web-chat enablement, inbound message storage, AI reply, and message polling
-- Production data gate: create or connect Supabase, apply `app/supabase/schema.sql`, seed the first workspace, and switch `MOCK_MODE=false`
+- Production data: Supabase with `MOCK_MODE=false`
 
 ## Required configuration
 
@@ -30,7 +29,7 @@ For WhatsApp via the session gateway, also set:
 - Confirm the provider webhook signature/token is configured.
 - Confirm a manual operator reply pauses the chatbot for that contact.
 - Confirm refunds, complaints, medical questions, and payment disputes are flagged for a human.
-- Replace the seeded demo password and workspace data before onboarding a real business.
+- Use a unique owner password and review all workspace data before onboarding a real business.
 
 ## Deployment gate
 

@@ -9,11 +9,11 @@ const SALT_BYTES = 16
 // Dev-only fallback; set AUTH_SECRET in production.
 const DEV_FALLBACK_SECRET = 'dev-secret-change-me'
 
-export const MOCK_DEMO_USER = {
-  userId: 'user-demo-1',
-  email: 'demo@studio.com',
-  password: 'demo1234',
-  name: 'Demo Owner',
+export const LOCAL_USER = {
+  userId: 'user-local-1',
+  email: process.env.LOCAL_ADMIN_EMAIL ?? 'owner@zenno.local',
+  password: process.env.LOCAL_ADMIN_PASSWORD ?? 'change-me-locally',
+  name: 'Zenno Owner',
 } as const
 
 export interface SessionPayload {

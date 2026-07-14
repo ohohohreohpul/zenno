@@ -24,7 +24,7 @@
 
 ## Phase 1 — Parity Core (weeks 1–3) ✅ mostly done
 
-The minimum where an agency demoing us next to DMChamp sees no gaps.
+The minimum where an agency comparing us with DMChamp sees no gaps.
 
 - [x] Multi-tenant model (Agency → Workspace → Contact/Message)
 - [x] Unified inbox with filter tabs, AI agent chat (Claude), Test-AI mode
@@ -93,5 +93,5 @@ Both competitors lose customers at onboarding. Win here.
 ## Suggested order of attack (next 3 sessions)
 
 1. Finish Phase 1 leftovers (filters, contact panel, chat status, deals/tasks CRUD)
-2. Setup Wizard with URL scraping → auto prompt (Phase 2, highest demo value)
+2. Setup Wizard with URL scraping → auto prompt (Phase 2, highest onboarding value)
 3. Tool-use booking agent (`check_schedule` / `book_trial`) — the "better than DMChamp" proof

@@ -136,6 +136,41 @@ create table if not exists stripe_events (
   id text primary key, type text not null, processed boolean not null default false, created_at timestamptz not null default now()
 );
 
+-- Stores only a SHA-256 hash of the server credential used with a publishable key.
+-- This provides a secure server-only fallback when a service-role key is unavailable.
+create table if not exists server_secrets (
+  id text primary key check (id = 'primary'),
+  secret_hash text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table server_secrets enable row level security;
+revoke all on table server_secrets from anon, authenticated;
+
+create or replace function is_server_request() returns boolean
+language sql stable security definer
+set search_path = pg_catalog, public, extensions
+as $$
+  select exists (
+    select 1
+    from public.server_secrets
+    where id = 'primary'
+      and secret_hash = encode(
+        digest(
+          coalesce(
+            (coalesce(nullif(current_setting('request.headers', true), ''), '{}')::jsonb ->> 'x-zenno-server-secret'),
+            ''
+          ),
+          'sha256'
+        ),
+        'hex'
+      )
+  )
+$$;
+
+revoke all on function is_server_request() from public;
+grant execute on function is_server_request() to anon, authenticated, service_role;
+
 create index if not exists contacts_workspace_idx on contacts(workspace_id, updated_at desc);
 create index if not exists messages_contact_idx on messages(contact_id, created_at);
 create index if not exists appointments_workspace_idx on appointments(workspace_id, starts_at);
@@ -156,6 +191,7 @@ end $$;
 create or replace function spend_credits(agency_id_param text, cost_param integer) returns jsonb language plpgsql security definer as $$
 declare new_balance integer;
 begin
+  if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
   update agencies set credits = credits - cost_param where id = agency_id_param and credits >= cost_param returning credits into new_balance;
   if new_balance is null then return jsonb_build_object('ok', false, 'balance', coalesce((select credits from agencies where id = agency_id_param), 0)); end if;
   return jsonb_build_object('ok', true, 'balance', new_balance);
@@ -163,12 +199,15 @@ end $$;
 
 create or replace function add_credits(agency_id_param text, amount_param integer) returns integer language plpgsql security definer as $$
 declare new_balance integer;
-begin update agencies set credits = credits + amount_param where id = agency_id_param returning credits into new_balance;
+begin
+if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
+update agencies set credits = credits + amount_param where id = agency_id_param returning credits into new_balance;
 if new_balance is null then raise exception 'Agency not found'; end if; return new_balance; end $$;
 
 create or replace function increment_slot_booking(slot_id text, expected_booked integer) returns jsonb language plpgsql security definer as $$
 declare updated schedule_slots;
 begin
+  if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
   update schedule_slots set booked = booked + 1 where id = slot_id and booked = expected_booked and booked < capacity returning * into updated;
   if updated.id is null then return null; end if; return to_jsonb(updated);
 end $$;
@@ -190,4 +229,21 @@ alter table workspace_ai_configs enable row level security;
 alter table credit_ledger enable row level security;
 alter table stripe_events enable row level security;
 
--- Server routes use the service-role key, which bypasses RLS. Never expose it to the browser.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'agencies','users','workspaces','contacts','messages','appointments','deals','tasks',
+    'schedule_slots','campaigns','campaign_enrollments','channel_connections',
+    'comment_automations','workspace_ai_configs','credit_ledger','stripe_events'
+  ] loop
+    execute format('drop policy if exists server_access on %I', t);
+    execute format(
+      'create policy server_access on %I for all to anon, authenticated using (is_server_request()) with check (is_server_request())',
+      t
+    );
+  end loop;
+end $$;
+
+-- Server routes use either the service role or a publishable key plus the private server header.
+-- Never expose AUTH_SECRET or SUPABASE_SERVICE_ROLE_KEY to the browser.

@@ -8,12 +8,12 @@
 - WhatsApp gateway, Telegram, LINE, Messenger, Instagram, and embeddable webchat adapters exist.
 - Manual operator replies pause the chatbot for the contact.
 - Internal APIs require a valid signed session; public webhook routes retain provider-specific verification.
-- Mock mode remains available for a self-contained demo.
+- An isolated local mode remains available for development without external services.
 - Lint, TypeScript, production build, and local production-server smoke tests pass.
 
 ## External launch dependencies
 
-- Apply the checked-in schema to Supabase and configure the service-role key in the deployment.
+- Keep the checked-in Supabase schema and production environment configuration synchronized.
 - Connect and verify at least one real messaging provider account.
 - Run a real customer-message → accurate answer → booking → human takeover acceptance test.
 

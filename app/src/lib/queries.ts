@@ -91,9 +91,9 @@ export async function createWorkspace(data: Record<string, unknown>) {
 
 export async function getUserByEmail(email: string) {
   if (IS_MOCK) {
-    const { MOCK_DEMO_USER } = await import('./auth')
-    if (email === MOCK_DEMO_USER.email) {
-      return { id: MOCK_DEMO_USER.userId, email, passwordHash: '', name: MOCK_DEMO_USER.name, role: 'owner', agencyId: 'agency-1' }
+    const { LOCAL_USER } = await import('./auth')
+    if (email === LOCAL_USER.email) {
+      return { id: LOCAL_USER.userId, email, passwordHash: '', name: LOCAL_USER.name, role: 'owner', agencyId: 'agency-1' }
     }
     return null
   }
