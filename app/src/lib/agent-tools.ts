@@ -5,6 +5,7 @@ import { connectDb } from './db'
 import { ScheduleSlot } from '@/models/ScheduleSlot'
 import { Appointment } from '@/models/Appointment'
 import { Contact } from '@/models/Contact'
+import { Deal, type DealStage } from '@/models/Deal'
 import type { ChatTurn } from './ai'
 
 const MAX_TOOL_ROUNDS = 5
@@ -38,6 +39,25 @@ export interface AppointmentCreateData {
 export interface ContactToolPatch {
   lifecycleStage?: string
   attentionRequired?: boolean
+  memorySummary?: string
+  memoryUpdatedAt?: Date
+}
+
+export interface DealCreateData {
+  workspaceId: string
+  contactId: string | null
+  contactName: string
+  name: string
+  value: number
+  currency: string
+  stage: DealStage
+  channel: string
+}
+
+export interface DealPatch {
+  stage?: DealStage
+  value?: number
+  name?: string
 }
 
 export interface AgentToolStore {
@@ -46,6 +66,9 @@ export interface AgentToolStore {
   incrementSlotBooking(id: string): Promise<ScheduleSlotData | null>
   createAppointment(data: AppointmentCreateData): Promise<{ _id: string }>
   updateContact(id: string, patch: ContactToolPatch): Promise<void>
+  getOpenDealForContact(contactId: string): Promise<{ _id: string; stage: DealStage; value: number } | null>
+  createDeal(data: DealCreateData): Promise<{ _id: string }>
+  updateDeal(id: string, patch: DealPatch): Promise<void>
 }
 
 export const mockToolStore: AgentToolStore = {
@@ -58,6 +81,17 @@ export const mockToolStore: AgentToolStore = {
   },
   updateContact: async (id, patch) => {
     MockDB.updateContact(id, patch)
+  },
+  getOpenDealForContact: async (contactId) => {
+    const open = MockDB.findOpenDealByContact(contactId)
+    return open ? { _id: open._id, stage: open.stage, value: open.value } : null
+  },
+  createDeal: async (data) => {
+    const deal = MockDB.createDeal(data)
+    return { _id: deal._id }
+  },
+  updateDeal: async (id, patch) => {
+    MockDB.updateDeal(id, patch)
   },
 }
 
@@ -123,6 +157,27 @@ export const dbToolStore: AgentToolStore = {
     await connectDb()
     await Contact.findByIdAndUpdate(id, { $set: patch })
   },
+  getOpenDealForContact: async (contactId) => {
+    await connectDb()
+    const deal = await Deal.findOne({
+      contactId,
+      stage: { $nin: ['won', 'lost'] },
+    })
+      .sort({ updatedAt: -1 })
+      .lean()
+      .select('_id stage value')
+    return deal ? { _id: String(deal._id), stage: deal.stage as DealStage, value: deal.value } : null
+  },
+  createDeal: async (data) => {
+    await connectDb()
+    const deal = await Deal.create(data)
+    return { _id: String(deal._id) }
+  },
+  updateDeal: async (id, patch) => {
+    if (!isValidObjectId(id)) return
+    await connectDb()
+    await Deal.findByIdAndUpdate(id, { $set: patch })
+  },
 }
 
 function getToolStore(): AgentToolStore {
@@ -133,7 +188,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: 'check_schedule',
     description:
-      'Look up the real class schedule with live availability. Call this before proposing class times or confirming a booking.',
+      'Look up the real class/availability schedule with live availability. Call this before proposing times or confirming a booking.',
     input_schema: {
       type: 'object',
       properties: {
@@ -142,16 +197,55 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: 'book_trial',
+    name: 'book_appointment',
     description:
-      'Book the customer into a class. Only call after the customer has clearly agreed to a specific class and time. This creates a real appointment.',
+      'Book the customer into a class/consult/trial. Only call after the customer has clearly agreed to a specific class and time. This creates a real appointment.',
     input_schema: {
       type: 'object',
       properties: {
         slot_id: { type: 'string', description: 'The slot _id from check_schedule' },
-        kind: { type: 'string', enum: ['trial', 'regular', 'consult'], description: 'trial for first-time visitors' },
+        kind: { type: 'string', enum: ['trial', 'regular', 'consult'], description: 'trial for first-time visitors, consult for paid consultations, regular for returning customers' },
       },
       required: ['slot_id'],
+    },
+  },
+  {
+    name: 'create_deal',
+    description:
+      'Open a sales deal (track money) when a customer is evaluating a paid package, membership, or service — even before they commit. Call this the moment a paid offering enters the conversation so pipeline value is captured.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short deal name, e.g. "Monthly Unlimited" or "10-Class Pack"' },
+        value: { type: 'number', description: 'Deal value in the business currency' },
+        stage: { type: 'string', enum: ['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost'], description: 'lead = just mentioned, proposal = you quoted a price, negotiation = handling objections, won = they agreed to pay' },
+      },
+      required: ['name', 'value', 'stage'],
+    },
+  },
+  {
+    name: 'update_deal',
+    description:
+      'Update the open deal for this contact — move the stage as the conversation progresses (proposal → negotiation → won) or adjust the value. Call when the customer agrees to pay (stage=won), declines (stage=lost), or you reframe the offer (value/stage).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        stage: { type: 'string', enum: ['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost'] },
+        value: { type: 'number', description: 'Adjusted deal value, if the offer changed' },
+        name: { type: 'string', description: 'Adjusted deal name, if the offering changed' },
+      },
+    },
+  },
+  {
+    name: 'save_memory',
+    description:
+      'Store an important fact about this contact you will want to remember next time — their budget, objections, preferences, timeline, or anything notable. Use this proactively so future conversations don\'t start from zero.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'A concise 1-3 sentence summary of what to remember about this contact right now (it replaces the prior summary, so include prior context too).' },
+      },
+      required: ['summary'],
     },
   },
   {
@@ -219,7 +313,7 @@ async function runTool(
     return { schedule: slots }
   }
 
-  if (name === 'book_trial') {
+  if (name === 'book_appointment' || name === 'book_trial') {
     const slotId = typeof input.slot_id === 'string' ? input.slot_id : ''
     const slot = await store.getScheduleSlot(slotId)
     if (!slot) return { error: 'Unknown slot_id. Call check_schedule first.' }
@@ -262,6 +356,42 @@ async function runTool(
     }
   }
 
+  if (name === 'create_deal') {
+    const dealName = typeof input.name === 'string' ? input.name : ''
+    const value = typeof input.value === 'number' ? input.value : 0
+    const stage = (input.stage as DealStage) ?? 'lead'
+    if (!dealName) return { error: 'name is required' }
+    const deal = await store.createDeal({
+      workspaceId: ctx.workspaceId,
+      contactId: ctx.contactId,
+      contactName: ctx.contactName,
+      name: dealName,
+      value,
+      currency: 'THB',
+      stage,
+      channel: ctx.channel,
+    })
+    return { created: true, deal_id: deal._id, name: dealName, value, stage }
+  }
+
+  if (name === 'update_deal') {
+    const open = await store.getOpenDealForContact(ctx.contactId)
+    if (!open) return { error: 'No open deal for this contact. Call create_deal first.' }
+    const patch: DealPatch = {}
+    if (typeof input.stage === 'string') patch.stage = input.stage as DealStage
+    if (typeof input.value === 'number') patch.value = input.value
+    if (typeof input.name === 'string') patch.name = input.name
+    await store.updateDeal(open._id, patch)
+    return { updated: true, deal_id: open._id, ...patch }
+  }
+
+  if (name === 'save_memory') {
+    const summary = typeof input.summary === 'string' ? input.summary : ''
+    if (!summary) return { error: 'summary is required' }
+    await store.updateContact(ctx.contactId, { memorySummary: summary, memoryUpdatedAt: new Date() })
+    return { saved: true }
+  }
+
   if (name === 'flag_for_human') {
     await store.updateContact(ctx.contactId, { attentionRequired: true })
     result.flaggedForHuman = true
@@ -273,7 +403,15 @@ async function runTool(
 
 const TOOL_GUIDANCE = `
 
-You have real tools: check_schedule (live availability), book_trial (actually books the class), and flag_for_human (escalates to staff). Always check the schedule before proposing times. When the customer agrees to a slot, book it immediately and confirm with the exact day, date, time, and instructor. Never invent availability.`
+You have real tools to close sales, not just chat:
+- check_schedule: live availability. Always call before proposing times.
+- book_appointment: actually books the customer in. Call the moment they agree to a specific class/time.
+- create_deal: open a sales deal the moment a paid package/membership/service enters the conversation — even if they haven't committed. Captures pipeline value.
+- update_deal: move the deal forward as the conversation progresses (proposal → negotiation → won), or mark lost if they decline. Call update_deal with stage="won" when they agree to pay.
+- save_memory: proactively save what's worth remembering about this contact (budget, objections, preferences, timeline) so future conversations pick up where this one left off.
+- flag_for_human: escalates to staff. Use for refunds, complaints, medical, payments.
+
+Never invent availability — check first. Never leave a paying conversation without a deal on the board. Always confirm bookings with exact day, date, time, and instructor.`
 
 /**
  * Tool-using agent loop — checks schedules, books appointments, escalates.

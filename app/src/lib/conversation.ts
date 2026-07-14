@@ -45,7 +45,24 @@ export async function handleIncoming(
     if (!ok) return
   }
 
-  const reply = await generateReplyWithTools(workspaceId, contact, contactId, incoming.content)
+  // Turn voice notes and photos into text before the agent reasons over them.
+  let effectiveContent = incoming.content
+  if (incoming.media && incoming.media.length > 0) {
+    try {
+      const { describeMedia } = await import('./media')
+      const desc = await describeMedia(incoming.media)
+      if (desc.understood && desc.text) {
+        effectiveContent = incoming.content
+          ? `${incoming.content}\n${desc.text}`
+          : desc.text
+      }
+    } catch {
+      // Media understanding must never block the reply — the agent can still
+      // acknowledge the message and ask the customer to clarify.
+    }
+  }
+
+  const reply = await generateReplyWithTools(workspaceId, contact, contactId, effectiveContent)
   if (!reply) return
 
   await Message.create({
@@ -93,7 +110,10 @@ async function generateReplyWithTools(
 
   const { guardrailsToPrompt } = await import('./guardrails')
   const systemPrompt = (config?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT) + guardrailsToPrompt(config?.guardrails)
-  const contactContext = `\n\nContact: ${contact.name ?? 'Unknown'} | Stage: ${contact.lifecycleStage} | Channel: ${contact.channel}`
+  const memoryContext = contact.memorySummary
+    ? `\n\nWhat you already know about this contact (use it — don't re-ask): ${contact.memorySummary}`
+    : ''
+  const contactContext = `\n\nContact: ${contact.name ?? 'Unknown'} | Stage: ${contact.lifecycleStage} | Channel: ${contact.channel}${memoryContext}`
 
   try {
     const result = await generateAgentReply(systemPrompt + contactContext, history, incomingText, {

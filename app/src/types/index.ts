@@ -54,10 +54,18 @@ export interface Conversation {
   unread_count: number
 }
 
+export interface IncomingMedia {
+  type: 'audio' | 'image' | 'video' | 'document'
+  url: string
+  mime?: string
+  caption?: string
+}
+
 export interface IncomingMessage {
   channel: Channel
   external_contact_id: string
   contact_name: string | null
   content: string
+  media?: IncomingMedia[]
   raw: unknown
 }

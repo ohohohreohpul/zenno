@@ -46,10 +46,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({ status: 'ok', received: messages.length })
 }
 
-interface WhatsAppTextMessage {
+interface WhatsAppMessage {
   type?: string
   from?: string
   text?: { body?: string }
+  image?: { id?: string; url?: string; caption?: string; mime_type?: string }
+  audio?: { id?: string; url?: string; mime_type?: string }
+  video?: { id?: string; url?: string; caption?: string; mime_type?: string }
+  document?: { id?: string; url?: string; caption?: string; mime_type?: string; filename?: string }
 }
 
 interface WhatsAppContactInfo {
@@ -60,13 +64,13 @@ interface WhatsAppContactInfo {
 function extractWhatsAppMessages(payload: unknown): IncomingMessage[] {
   const results: IncomingMessage[] = []
   const root = payload as {
-    entry?: { changes?: { value?: { messages?: WhatsAppTextMessage[]; contacts?: WhatsAppContactInfo[] } }[] }[]
+    entry?: { changes?: { value?: { messages?: WhatsAppMessage[]; contacts?: WhatsAppContactInfo[] } }[] }[]
     // 360dialog also posts a flat shape: { messages: [...], contacts: [...] }
-    messages?: WhatsAppTextMessage[]
+    messages?: WhatsAppMessage[]
     contacts?: WhatsAppContactInfo[]
   }
 
-  const batches: { messages?: WhatsAppTextMessage[]; contacts?: WhatsAppContactInfo[] }[] = []
+  const batches: { messages?: WhatsAppMessage[]; contacts?: WhatsAppContactInfo[] }[] = []
   for (const entry of root?.entry ?? []) {
     for (const change of entry?.changes ?? []) {
       if (change?.value) batches.push(change.value)
@@ -76,13 +80,33 @@ function extractWhatsAppMessages(payload: unknown): IncomingMessage[] {
 
   for (const batch of batches) {
     for (const msg of batch.messages ?? []) {
-      if (msg.type !== 'text' || !msg.from || !msg.text?.body) continue
+      if (!msg.from) continue
       const contact = batch.contacts?.find((c) => c.wa_id === msg.from)
+      const text = msg.type === 'text' ? msg.text?.body ?? '' : ''
+      const media: IncomingMessage['media'] = []
+
+      if (msg.type === 'audio' && msg.audio?.url) {
+        media.push({ type: 'audio', url: msg.audio.url, mime: msg.audio.mime_type })
+      } else if (msg.type === 'image' && msg.image?.url) {
+        media.push({ type: 'image', url: msg.image.url, mime: msg.image.mime_type, caption: msg.image.caption })
+      } else if (msg.type === 'video' && msg.video?.url) {
+        media.push({ type: 'video', url: msg.video.url, mime: msg.video.mime_type, caption: msg.video.caption })
+      } else if (msg.type === 'document' && msg.document?.url) {
+        media.push({ type: 'document', url: msg.document.url, mime: msg.document.mime_type, caption: msg.document.caption ?? msg.document.filename })
+      } else if (msg.type !== 'text') {
+        // Unknown / unsupported message type — skip so we don't reply to
+        // reactions, statuses, or system events as if they were customer text.
+        continue
+      }
+
+      if (!text && media.length === 0) continue
+
       results.push({
         channel: 'whatsapp',
         external_contact_id: msg.from,
         contact_name: contact?.profile?.name ?? null,
-        content: msg.text.body,
+        content: text,
+        media: media.length > 0 ? media : undefined,
         raw: msg,
       })
     }

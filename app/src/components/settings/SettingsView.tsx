@@ -6,6 +6,7 @@ import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './Guardr
 import { WhatsAppConnectCard } from './WhatsAppConnectCard'
 import { CredentialChannelCard, type ChannelCardConfig } from './CredentialChannelCard'
 import { WebchatCard } from './WebchatCard'
+import { OptimizeCard } from './OptimizeCard'
 
 const CHANNELS = [
   {
@@ -181,6 +182,8 @@ export function SettingsView() {
             </div>
 
             <GuardrailsSection guardrails={guardrails} onChange={setGuardrails} />
+
+            <OptimizeCard />
 
             <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>AI Model</div>

@@ -1,15 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Zap, Play, Pause } from 'lucide-react'
-import { FlowBuilder } from './FlowBuilder'
+import { Plus, Sparkles, Play } from 'lucide-react'
+import { CampaignBuilder } from './CampaignBuilder'
 import { CommentToDmTab } from './CommentToDmTab'
 import { BroadcastTab } from './BroadcastTab'
 
-type CampaignTab = 'flows' | 'commentToDm' | 'broadcast'
+type CampaignTab = 'aiCampaigns' | 'commentToDm' | 'broadcast'
 
 const TAB_LABELS: Record<CampaignTab, string> = {
-  flows: 'Flows',
+  aiCampaigns: 'AI Campaigns',
   commentToDm: 'Comment-to-DM',
   broadcast: 'Broadcast',
 }
@@ -19,6 +19,7 @@ interface Campaign {
   name: string
   status: 'draft' | 'active' | 'paused' | 'completed'
   trigger_stage: string | null
+  goal?: string
   flow: unknown[]
   created_at: string
 }
@@ -28,7 +29,7 @@ export function CampaignsView() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Campaign | null>(null)
   const [showBuilder, setShowBuilder] = useState(false)
-  const [activeTab, setActiveTab] = useState<CampaignTab>('flows')
+  const [activeTab, setActiveTab] = useState<CampaignTab>('aiCampaigns')
 
   useEffect(() => {
     fetch('/api/campaigns?workspaceId=ws-1')
@@ -39,13 +40,22 @@ export function CampaignsView() {
 
   if (showBuilder || editing) {
     return (
-      <FlowBuilder
+      <CampaignBuilder
         campaign={editing ?? undefined}
         onSave={(saved) => {
+          const normalized: Campaign = {
+            id: saved.id,
+            name: saved.name,
+            status: editing?.status ?? 'draft',
+            trigger_stage: saved.triggerStage ?? null,
+            goal: saved.goal ?? '',
+            flow: editing?.flow ?? [],
+            created_at: editing?.created_at ?? new Date().toISOString(),
+          }
           setCampaigns((prev) =>
             editing
-              ? prev.map((c) => (c.id === saved.id ? saved : c))
-              : [saved, ...prev],
+              ? prev.map((c) => (c.id === saved.id ? normalized : c))
+              : [normalized, ...prev],
           )
           setEditing(null)
           setShowBuilder(false)
@@ -60,7 +70,6 @@ export function CampaignsView() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
       <div
         style={{
           height: 'var(--topbar-height)',
@@ -76,7 +85,7 @@ export function CampaignsView() {
         <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', flex: 1 }}>
           Campaigns
         </span>
-        {activeTab === 'flows' && (
+        {activeTab === 'aiCampaigns' && (
           <button
             onClick={() => setShowBuilder(true)}
             style={{
@@ -99,7 +108,6 @@ export function CampaignsView() {
         )}
       </div>
 
-      {/* Tabs */}
       <div
         style={{
           display: 'flex',
@@ -110,7 +118,7 @@ export function CampaignsView() {
           flexShrink: 0,
         }}
       >
-        {(['flows', 'commentToDm', 'broadcast'] as const).map((tab) => {
+        {(['aiCampaigns', 'commentToDm', 'broadcast'] as const).map((tab) => {
           const active = activeTab === tab
           return (
             <button
@@ -134,7 +142,6 @@ export function CampaignsView() {
         })}
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         {activeTab === 'commentToDm' ? (
           <CommentToDmTab />
@@ -147,11 +154,7 @@ export function CampaignsView() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {campaigns.map((c) => (
-              <CampaignCard
-                key={c.id}
-                campaign={c}
-                onEdit={() => setEditing(c)}
-              />
+              <CampaignCard key={c.id} campaign={c} onEdit={() => setEditing(c)} />
             ))}
           </div>
         )}
@@ -188,6 +191,12 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
     }
   }
 
+  const goalPreview = campaign.goal?.trim()
+    ? campaign.goal.length > 110
+      ? campaign.goal.slice(0, 110) + '…'
+      : campaign.goal
+    : 'No goal set — add one to make this AI-driven.'
+
   return (
     <div
       style={{
@@ -196,7 +205,7 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
         borderRadius: 'var(--radius)',
         padding: '16px 20px',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 16,
         cursor: 'pointer',
         transition: 'box-shadow var(--duration-fast)',
@@ -217,17 +226,21 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
           flexShrink: 0,
         }}
       >
-        <Zap size={16} color="var(--text-secondary)" />
+        <Sparkles size={16} color="var(--text-secondary)" />
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>
           {campaign.name}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 3 }}>
-          {campaign.flow.length} steps
-          {campaign.trigger_stage && (
-            <span> · triggers on <strong style={{ color: 'var(--text-secondary)' }}>{campaign.trigger_stage.replace('_', ' ')}</strong></span>
+        <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4, lineHeight: 1.45 }}>
+          {goalPreview}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+          {campaign.trigger_stage ? (
+            <>fires on <strong style={{ color: 'var(--text-secondary)' }}>{campaign.trigger_stage.replace('_', ' ')}</strong></>
+          ) : (
+            'manual only'
           )}
         </div>
       </div>
@@ -248,6 +261,7 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
           cursor: 'pointer',
           whiteSpace: 'nowrap',
           transition: 'all var(--duration-fast)',
+          flexShrink: 0,
         }}
       >
         <Play size={12} />
@@ -264,6 +278,8 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
           color: statusColor[campaign.status],
           textTransform: 'capitalize',
           letterSpacing: '0.02em',
+          flexShrink: 0,
+          marginTop: 2,
         }}
       >
         {campaign.status}
@@ -296,14 +312,15 @@ function EmptyCampaigns({ onNew }: { onNew: () => void }) {
           justifyContent: 'center',
         }}
       >
-        <Zap size={24} color="var(--text-secondary)" />
+        <Sparkles size={24} color="var(--text-secondary)" />
       </div>
       <div>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>
           No campaigns yet
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 6, maxWidth: 280 }}>
-          Build automated message sequences that fire when a contact reaches a lifecycle stage.
+        <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 6, maxWidth: 320 }}>
+          Give the AI a sales goal and a trigger stage. It writes a personalized opening message
+          for every contact and handles the conversation from there — no flow builder needed.
         </div>
       </div>
       <button

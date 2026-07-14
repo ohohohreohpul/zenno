@@ -3,7 +3,9 @@ import { z } from 'zod'
 import { generateReplyCore, hasAiKey } from '@/lib/ai'
 
 const FETCH_TIMEOUT_MS = 12_000
-const MAX_TEXT_CHARS = 8_000
+const MAX_PAGES = 5
+const MAX_TEXT_CHARS_PER_PAGE = 8_000
+const MAX_TOTAL_CHARS = 30_000
 
 const requestSchema = z.object({
   url: z.string().url(),
@@ -24,31 +26,107 @@ function htmlToText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, MAX_TEXT_CHARS)
+    .slice(0, MAX_TEXT_CHARS_PER_PAGE)
+}
+
+interface PageLink {
+  href: string
+  text: string
+  score: number
+}
+
+// Keywords that signal sales-relevant pages. Higher score = higher priority.
+const PAGE_KEYWORDS: { re: RegExp; score: number }[] = [
+  { re: /pric(e|ing)/i, score: 10 },
+  { re: /schedul(e|ing)/i, score: 9 },
+  { re: /class(e|es)/i, score: 8 },
+  { re: /service(s)?/i, score: 8 },
+  { re: /treatment/i, score: 8 },
+  { re: /menu/i, score: 7 },
+  { re: /faq|frequently.asked|question/i, score: 7 },
+  { re: /book(ing)?|appoint(ment)?|reserve/i, score: 7 },
+  { re: /about|team|staff|therapist|instructor/i, score: 5 },
+  { re: /package|offer|promo|deal/i, score: 6 },
+  { re: /membership|plan/i, score: 6 },
+  { re: /location|contact|find/i, score: 4 },
+  { re: /review|testimonial/i, score: 3 },
+]
+
+function extractLinks(html: string, baseUrl: URL): PageLink[] {
+  const links: PageLink[] = []
+  const anchorRe = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let match: RegExpExecArray | null
+  while ((match = anchorRe.exec(html)) !== null) {
+    const rawHref = match[1]
+    const text = htmlToText(match[2]).slice(0, 80)
+    if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:') || rawHref.startsWith('javascript:')) continue
+    let resolved: URL
+    try {
+      resolved = new URL(rawHref, baseUrl)
+    } catch {
+      continue
+    }
+    if (resolved.hostname !== baseUrl.hostname) continue
+    if (resolved.pathname === baseUrl.pathname && !resolved.search) continue
+    const label = `${text} ${resolved.pathname}`.toLowerCase()
+    const score = PAGE_KEYWORDS.reduce((max, k) => (k.re.test(label) ? Math.max(max, k.score) : max), 0)
+    links.push({ href: resolved.toString(), text, score })
+  }
+  // Dedupe by href, keep highest score, sort.
+  const byHref = new Map<string, PageLink>()
+  for (const l of links) {
+    const existing = byHref.get(l.href)
+    if (!existing || l.score > existing.score) byHref.set(l.href, l)
+  }
+  return [...byHref.values()].sort((a, b) => b.score - a.score)
 }
 
 function fallbackPrompt(businessType: string, siteText: string, url: string): string {
-  return `You are a warm, knowledgeable AI assistant for a ${businessType}. Help customers with schedules, pricing, services, and bookings.
+  return `You are a senior sales agent for a ${businessType}. Your job is to turn conversations into bookings and revenue — not just answer questions.
 
-Always be friendly, concise, and encouraging. Keep replies to 2-4 sentences. When someone seems interested, offer to book a trial or appointment. Respond in the same language the customer uses.
+Qualify fast, build value before price, handle objections by reframing and proposing a next step, and always move toward a booking or a sale. Use your tools to check the schedule, book the moment they agree, and escalate refunds/complaints/medical to a human. Keep replies to 2–4 sentences, sound human, match their language, and never give up after one objection.
 
 Business website: ${url}
 
 Information extracted from the website:
-${siteText.slice(0, 3000)}`
+${siteText.slice(0, 4000)}
+
+Always reply in the same language the contact is using.`
 }
 
-const PROMPT_WRITER_SYSTEM = `You write system prompts for AI sales agents of wellness/beauty businesses. Given website text, produce a system prompt that:
-1. Opens with the agent's role and business name (found in the text)
-2. Lists concrete facts: services, class/treatment names, schedules, prices, location, contact policies
-3. Sets tone: warm, concise (2-4 sentences per reply), never pushy, always offers to book a trial/appointment when interest is shown
-4. Instructs to reply in the customer's language
-Output ONLY the system prompt text, no preamble.`
+const PROMPT_WRITER_SYSTEM = `You write system prompts for AI SALES agents of small businesses. Given a business's website text (possibly from several pages), produce a system prompt that makes the agent SELL, not just answer questions.
+
+The prompt must include:
+1. The agent's role: a senior sales agent whose goal is bookings, deals, and revenue — framed as genuinely helping the customer.
+2. Concrete facts found on the site: business name, services/classes/treatments, schedules, prices, packages/memberships, location, contact policies, differentiators. If a fact isn't in the text, do NOT invent it — write "Ask the business to confirm" for that slot.
+3. Sales behavior: qualify (one question at a time), build value before price, handle objections (don't fold after one "no"), always propose a concrete next step, use tools to check the schedule and book, create a deal when a paid offering is discussed, escalate refunds/complaints/medical/payments to a human.
+4. Style: short replies (2–4 sentences), sound human, break long replies into two messages, match the customer's language, no robotic sign-offs, no bullet lists in chat.
+
+Output ONLY the system prompt text, no preamble or commentary.`
+
+async function fetchPage(target: URL): Promise<{ text: string; html: string } | null> {
+  try {
+    const res = await fetch(target.toString(), {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgentSetupBot/1.0)' },
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    return { text: htmlToText(html), html }
+  } catch {
+    return null
+  }
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown
@@ -64,28 +142,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'This URL is not allowed' }, { status: 422 })
   }
 
-  let siteText = ''
-  try {
-    const res = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgentSetupBot/1.0)' },
-    })
-    if (!res.ok) throw new Error(`Site responded with ${res.status}`)
-    siteText = htmlToText(await res.text())
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch the website'
-    return NextResponse.json({ error: `Could not read the website: ${message}` }, { status: 422 })
+  // 1. Fetch the homepage (keep its HTML for link discovery).
+  const home = await fetchPage(url)
+  if (!home || !home.text) {
+    return NextResponse.json({ error: 'Could not read the website' }, { status: 422 })
   }
 
-  if (!siteText) {
-    return NextResponse.json({ error: 'The website returned no readable text' }, { status: 422 })
+  // 2. Discover sales-relevant sub-pages and fetch up to MAX_PAGES of them.
+  const candidates = extractLinks(home.html, url).filter((l) => l.score > 0)
+  const visited = new Set<string>([url.toString().replace(/#.*$/, '')])
+  const pageTexts: string[] = [`[Homepage — ${url.pathname || '/'}]\n${home.text}`]
+
+  for (const link of candidates) {
+    if (pageTexts.length - 1 >= MAX_PAGES) break
+    const cleanHref = link.href.replace(/#.*$/, '')
+    if (visited.has(cleanHref)) continue
+    visited.add(cleanHref)
+    const page = await fetchPage(new URL(cleanHref))
+    if (page && page.text) {
+      const label = pageTexts.length === 1 ? '[Homepage]' : `[${link.text || new URL(cleanHref).pathname}]`
+      pageTexts.push(`${label}\n${page.text}`)
+    }
   }
+
+  let combined = pageTexts.join('\n\n---\n\n')
+  if (combined.length > MAX_TOTAL_CHARS) combined = combined.slice(0, MAX_TOTAL_CHARS)
+  const pagesFetched = pageTexts.length
 
   if (!hasAiKey()) {
     return NextResponse.json({
       data: {
-        systemPrompt: fallbackPrompt(businessType, siteText, url.toString()),
-        siteTextPreview: siteText.slice(0, 400),
+        systemPrompt: fallbackPrompt(businessType, combined, url.toString()),
+        siteTextPreview: combined.slice(0, 400),
+        pagesScraped: pagesFetched,
         aiGenerated: false,
       },
     })
@@ -95,16 +184,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const systemPrompt = await generateReplyCore(
       PROMPT_WRITER_SYSTEM,
       [],
-      `Business type: ${businessType}\nWebsite: ${url.toString()}\n\nWebsite text:\n${siteText}`,
+      `Business type: ${businessType}\nWebsite: ${url.toString()}\nPages scraped: ${pagesFetched}\n\nWebsite text:\n${combined}`,
+      1600,
     )
     return NextResponse.json({
-      data: { systemPrompt, siteTextPreview: siteText.slice(0, 400), aiGenerated: true },
+      data: { systemPrompt, siteTextPreview: combined.slice(0, 400), pagesScraped: pagesFetched, aiGenerated: true },
     })
   } catch {
     return NextResponse.json({
       data: {
-        systemPrompt: fallbackPrompt(businessType, siteText, url.toString()),
-        siteTextPreview: siteText.slice(0, 400),
+        systemPrompt: fallbackPrompt(businessType, combined, url.toString()),
+        siteTextPreview: combined.slice(0, 400),
+        pagesScraped: pagesFetched,
         aiGenerated: false,
       },
     })

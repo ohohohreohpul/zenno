@@ -4,12 +4,14 @@ import { IS_MOCK, MockDB } from '@/lib/mock-store'
 import { connectDb } from '@/lib/db'
 import { Campaign } from '@/models/Campaign'
 
+const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
+
 const flowNodeSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('message'), content: z.string().min(1), channel: z.enum(['whatsapp','instagram','line','webchat','sms','email']).optional() }),
   z.object({ type: z.literal('wait'), delayMs: z.number().int().min(0) }),
   z.object({
     type: z.literal('branch'),
-    condition: z.object({ field: z.literal('lifecycle_stage'), equals: z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip']) }),
+    condition: z.object({ field: z.literal('lifecycle_stage'), equals: lifecycleEnum }),
     trueIndex: z.number().int().min(0),
     falseIndex: z.number().int().min(0),
   }),
@@ -19,9 +21,13 @@ const flowNodeSchema = z.discriminatedUnion('type', [
 const createSchema = z.object({
   workspaceId: z.string().min(1),
   name: z.string().min(1).max(120),
-  triggerStage: z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip']).optional(),
-  flow: z.array(flowNodeSchema).min(1),
-})
+  triggerStage: lifecycleEnum.optional(),
+  goal: z.string().max(4000).optional(),
+  flow: z.array(flowNodeSchema).optional(),
+}).refine(
+  (d) => (d.goal && d.goal.trim().length > 0) || (d.flow && d.flow.length > 0),
+  { message: 'Either goal or flow is required' },
+)
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
@@ -46,14 +52,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
+  const { workspaceId, name, triggerStage, goal, flow } = parsed.data
+  const goalText = goal ?? ''
+  const flowArr = flow ?? []
+
   if (IS_MOCK) {
-    const { workspaceId, name, triggerStage, flow } = parsed.data
-    const c = MockDB.createCampaign({ workspaceId, name, triggerStage: triggerStage ?? 'inquiry', flow, status: 'draft' })
+    const c = MockDB.createCampaign({ workspaceId, name, triggerStage: triggerStage ?? 'inquiry', goal: goalText, flow: flowArr, status: 'draft' })
     return NextResponse.json({ data: { ...c, id: c._id } }, { status: 201 })
   }
 
   await connectDb()
-  const { workspaceId, name, triggerStage, flow } = parsed.data
-  const campaign = await Campaign.create({ workspaceId, name, triggerStage: triggerStage ?? null, flow, status: 'draft' })
+  const campaign = await Campaign.create({ workspaceId, name, triggerStage: triggerStage ?? null, goal: goalText, flow: flowArr, status: 'draft' })
   return NextResponse.json({ data: { ...campaign.toObject(), id: campaign._id.toString() } }, { status: 201 })
 }

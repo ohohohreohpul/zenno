@@ -19,6 +19,8 @@ interface MockContact {
   attentionRequired: boolean
   unread: number
   notes: string
+  memorySummary: string
+  memoryUpdatedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -103,6 +105,7 @@ interface MockCampaign {
   name: string
   status: 'draft' | 'active' | 'paused' | 'archived'
   triggerStage: string
+  goal: string
   flow: object[]
   createdAt: Date
   updatedAt: Date
@@ -149,12 +152,12 @@ export const mockWorkspaces: MockWorkspace[] = [
 ]
 
 export const mockContacts: MockContact[] = [
-  { _id: 'c-1', workspaceId: 'ws-1', externalId: '66812345678', channel: 'whatsapp', name: 'Mia Tanaka', phone: '+66812345678', lifecycleStage: 'inquiry', tags: ['yoga', 'trial'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 2, notes: '', createdAt: ago(120), updatedAt: ago(5) },
-  { _id: 'c-2', workspaceId: 'ws-1', externalId: '66823456789', channel: 'whatsapp', name: 'Lena Hoffmann', phone: '+66823456789', lifecycleStage: 'qualified', tags: ['spa', 'vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: true, unread: 1, notes: 'Wants to start monthly unlimited this week — needs human confirmation for payment.', createdAt: ago(200), updatedAt: ago(30) },
-  { _id: 'c-3', workspaceId: 'ws-1', externalId: 'ig_sarahloves', channel: 'instagram', name: 'Sarah Chen', phone: null, lifecycleStage: 'trial_booked', tags: ['inquiry'], botActive: false, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: '', createdAt: ago(480), updatedAt: ago(60) },
-  { _id: 'c-4', workspaceId: 'ws-1', externalId: 'line_kk2024', channel: 'line', name: 'Koko Watanabe', phone: null, lifecycleStage: 'attended', tags: ['lead'], botActive: false, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Prefers Thai language.', createdAt: ago(1440), updatedAt: ago(240) },
-  { _id: 'c-5', workspaceId: 'ws-1', externalId: '66834567890', channel: 'whatsapp', name: 'Priya Nair', phone: '+66834567890', lifecycleStage: 'rebooked', tags: ['retreat'], botActive: true, dnd: true, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Attended March retreat. Early-bird for next one.', createdAt: ago(2880), updatedAt: ago(480) },
-  { _id: 'c-6', workspaceId: 'ws-2', externalId: '66845678901', channel: 'whatsapp', name: 'Emma Williams', phone: '+66845678901', lifecycleStage: 'vip', tags: ['vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: '', createdAt: ago(4320), updatedAt: ago(720) },
+  { _id: 'c-1', workspaceId: 'ws-1', externalId: '66812345678', channel: 'whatsapp', name: 'Mia Tanaka', phone: '+66812345678', lifecycleStage: 'inquiry', tags: ['yoga', 'trial'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 2, notes: '', memorySummary: 'First-time inquiry via Instagram. Interested in morning classes. Asked about 7am vs 9am. Considering a trial.', memoryUpdatedAt: ago(5), createdAt: ago(120), updatedAt: ago(5) },
+  { _id: 'c-2', workspaceId: 'ws-1', externalId: '66823456789', channel: 'whatsapp', name: 'Lena Hoffmann', phone: '+66823456789', lifecycleStage: 'qualified', tags: ['spa', 'vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: true, unread: 1, notes: 'Wants to start monthly unlimited this week — needs human confirmation for payment.', memorySummary: 'Returning interest in monthly unlimited (2,500 THB). Compared against 10-class pack. Wants to start this week. Payment needs human.', memoryUpdatedAt: ago(30), createdAt: ago(200), updatedAt: ago(30) },
+  { _id: 'c-3', workspaceId: 'ws-1', externalId: 'ig_sarahloves', channel: 'instagram', name: 'Sarah Chen', phone: null, lifecycleStage: 'trial_booked', tags: ['inquiry'], botActive: false, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: '', memorySummary: 'Booked a 9am trial class. Enthusiastic tone. Bot paused (human took over).', memoryUpdatedAt: ago(60), createdAt: ago(480), updatedAt: ago(60) },
+  { _id: 'c-4', workspaceId: 'ws-1', externalId: 'line_kk2024', channel: 'line', name: 'Koko Watanabe', phone: null, lifecycleStage: 'attended', tags: ['lead'], botActive: false, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Prefers Thai language.', memorySummary: 'Attended a class. Prefers Thai. Chat closed — re-engagement candidate.', memoryUpdatedAt: ago(240), createdAt: ago(1440), updatedAt: ago(240) },
+  { _id: 'c-5', workspaceId: 'ws-1', externalId: '66834567890', channel: 'whatsapp', name: 'Priya Nair', phone: '+66834567890', lifecycleStage: 'rebooked', tags: ['retreat'], botActive: true, dnd: true, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Attended March retreat. Early-bird for next one.', memorySummary: 'Past retreat attendee. Offered early-bird for next retreat (4,200 THB). On DND.', memoryUpdatedAt: ago(480), createdAt: ago(2880), updatedAt: ago(480) },
+  { _id: 'c-6', workspaceId: 'ws-2', externalId: '66845678901', channel: 'whatsapp', name: 'Emma Williams', phone: '+66845678901', lifecycleStage: 'vip', tags: ['vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: '', memorySummary: 'VIP customer. No open objections.', memoryUpdatedAt: null, createdAt: ago(4320), updatedAt: ago(720) },
 ]
 
 export const mockDeals: MockDeal[] = [
@@ -248,13 +251,8 @@ export const mockCampaigns: MockCampaign[] = [
     name: 'New Inquiry Welcome',
     status: 'active',
     triggerStage: 'inquiry',
-    flow: [
-      { type: 'message', content: 'Hi {{name}}! Thanks for reaching out to Lotus Yoga. Would you like to book a free trial class?' },
-      { type: 'wait', delay: 60, unit: 'minutes' },
-      { type: 'branch', condition: 'no_reply', branches: { yes: 'continue', no: 'exit' } },
-      { type: 'message', content: "Just following up — our 9am class tomorrow has a few spots left. Shall I reserve one for you?" },
-      { type: 'exit' },
-    ],
+    goal: 'Welcome the lead, find out what they want, and book them into a free trial class this week. Offer the most relevant class based on what they say.',
+    flow: [],
     createdAt: ago(10080),
     updatedAt: ago(1440),
   },
@@ -264,12 +262,8 @@ export const mockCampaigns: MockCampaign[] = [
     name: 'Post Trial Follow-up',
     status: 'active',
     triggerStage: 'attended',
-    flow: [
-      { type: 'message', content: "Hi {{name}}! How did you enjoy your trial class today? We'd love to hear your thoughts 🌿" },
-      { type: 'wait', delay: 24, unit: 'hours' },
-      { type: 'message', content: "We have a special first-month offer just for you — unlimited classes for 1,999 THB. Ready to continue your journey?" },
-      { type: 'exit' },
-    ],
+    goal: 'Thank them for coming, ask how it went, then convert them to a paid membership with a first-month offer (unlimited 1,999 THB). Handle the "I need to think about it" objection.',
+    flow: [],
     createdAt: ago(5040),
     updatedAt: ago(720),
   },
@@ -279,10 +273,8 @@ export const mockCampaigns: MockCampaign[] = [
     name: 'Re-engagement',
     status: 'draft',
     triggerStage: 'qualified',
-    flow: [
-      { type: 'message', content: "Hi {{name}}, we miss you at Lotus Yoga! Come back this week and get 20% off your next class." },
-      { type: 'exit' },
-    ],
+    goal: 'Win back a qualified lead who went quiet. Acknowledge they were interested, offer a concrete reason to return (a new class, a limited offer, or a consult), and book them in.',
+    flow: [],
     createdAt: ago(2880),
     updatedAt: ago(2880),
   },
@@ -315,6 +307,9 @@ export const MockDB = {
 
   // Deals
   getDeals: (workspaceId: string) => _deals.filter(d => d.workspaceId === workspaceId),
+  getDeal: (id: string) => _deals.find(d => d._id === id) ?? null,
+  findOpenDealByContact: (contactId: string) =>
+    _deals.find(d => d.contactId === contactId && !['won', 'lost'].includes(d.stage)) ?? null,
   createDeal: (data: Omit<MockDeal, '_id' | 'createdAt' | 'updatedAt'>) => {
     const deal: MockDeal = { ...data, _id: uid(), createdAt: new Date(), updatedAt: new Date() }
     _deals = [..._deals, deal]
@@ -373,6 +368,13 @@ export const MockDB = {
     const c = { ...data, _id: uid(), createdAt: new Date(), updatedAt: new Date() }
     _campaigns = [..._campaigns, c]
     return c
+  },
+  updateCampaign: (id: string, patch: Partial<Omit<MockCampaign, '_id' | 'workspaceId' | 'createdAt'>>) => {
+    const existing = _campaigns.find(c => c._id === id)
+    if (!existing) return null
+    const updated = { ...existing, ...patch, updatedAt: new Date() }
+    _campaigns = _campaigns.map(c => (c._id === id ? updated : c))
+    return updated
   },
 
   // Agencies
@@ -440,14 +442,14 @@ export interface MockGuardrails {
 
 let _guardrails: Record<string, MockGuardrails> = {}
 
-const DEFAULT_MOCK_SYSTEM_PROMPT = `You are a warm and knowledgeable assistant for Lotus Yoga Bangkok. Your role is to help potential and existing students with class schedules, pricing, bookings, and general questions about the studio.
+const DEFAULT_MOCK_SYSTEM_PROMPT = `You are a senior sales agent for Lotus Yoga Bangkok. Your job is to turn conversations into bookings and memberships — not just answer questions.
 
-Always be friendly, concise, and encouraging. Keep replies to 2-4 sentences. When someone seems interested in joining, offer to book a free trial class for them. Respond in the same language the customer uses.
+Qualify fast (one question at a time), build value before price, handle objections by reframing and proposing a next step, and always move toward a booking. Use your tools: check the schedule, book the moment they agree, create a deal when they evaluate a paid package, escalate refunds/complaints/medical to a human. Keep replies to 2–4 sentences, sound human, match their language, and never give up after one objection.
 
-Key information:
+Key knowledge:
 - Classes: Morning Flow (7am, 9am), Evening Yin (6:30pm), Weekend Workshop (Sat 10am)
 - Pricing: Drop-in 450 THB, 10-class pack 1,800 THB, Monthly unlimited 2,500 THB
-- Free trial class available for first-time visitors
+- Free trial class available for first-time visitors — lead with this for new inquiries
 - Location: Sukhumvit Soi 23, Bangkok`
 
 let _systemPrompts: Record<string, string> = {}

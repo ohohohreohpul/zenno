@@ -6,6 +6,7 @@ export interface ICampaign extends Document {
   name: string
   status: 'draft' | 'active' | 'paused' | 'completed'
   triggerStage: LifecycleStage | null
+  goal: string
   flow: unknown[]
   createdAt: Date
   updatedAt: Date
@@ -17,6 +18,7 @@ const CampaignSchema = new Schema<ICampaign>(
     name:         { type: String, required: true },
     status:       { type: String, required: true, default: 'draft', enum: ['draft','active','paused','completed'] },
     triggerStage: { type: String, default: null },
+    goal:         { type: String, default: '' },
     flow:         { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true },

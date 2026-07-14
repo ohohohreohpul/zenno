@@ -16,6 +16,8 @@ export interface IContact extends Document {
   attentionRequired: boolean
   unread: number
   notes: string
+  memorySummary: string
+  memoryUpdatedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -42,6 +44,8 @@ const ContactSchema = new Schema<IContact>(
     attentionRequired: { type: Boolean, default: false },
     unread:            { type: Number, default: 0 },
     notes:             { type: String, default: '' },
+    memorySummary:     { type: String, default: '' },
+    memoryUpdatedAt:   { type: Date, default: null },
   },
   { timestamps: true },
 )
