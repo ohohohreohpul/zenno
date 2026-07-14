@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppointments, getContacts, getMessages } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const WEEK_MS = 7 * 86_400_000
 interface MessageRow { direction: string; aiGenerated?: boolean; createdAt: string | Date }
@@ -13,7 +14,7 @@ function computeVolumeByDay(messages: MessageRow[]) {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1')
   const contacts = await getContacts(workspaceId) as unknown as Array<{ id: string; lifecycleStage: string; channel: string }>
   const [messageGroups, appointments] = await Promise.all([
     Promise.all(contacts.map((c) => getMessages(c.id))), getAppointments(workspaceId),

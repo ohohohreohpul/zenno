@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCampaign } from '@/lib/campaign-runner'
-import { getCampaignDeliveryStats } from '@/lib/queries'
+import { getCampaign, getCampaignDeliveryStats } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 
-export async function POST(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+export async function POST(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
+  const campaign = await getCampaign(id) as { workspaceId?: string } | null
+  if (!campaign || campaign.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
   try {
     const result = await runCampaign(id)
@@ -17,7 +20,9 @@ export async function POST(_req: NextRequest, { params }: Params): Promise<NextR
   }
 }
 
-export async function GET(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+export async function GET(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
+  const campaign = await getCampaign(id) as { workspaceId?: string } | null
+  if (!campaign || campaign.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
   return NextResponse.json({ data: await getCampaignDeliveryStats(id) })
 }

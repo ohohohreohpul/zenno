@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { findCampaignAudience } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const stage = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
 const schema = z.object({
@@ -15,6 +16,6 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
-  const contacts = await findCampaignAudience(parsed.data.workspaceId, parsed.data) as Array<Record<string, unknown>>
+  const contacts = await findCampaignAudience(requestWorkspaceId(req, parsed.data.workspaceId), parsed.data) as Array<Record<string, unknown>>
   return NextResponse.json({ data: { count: contacts.length, contacts: contacts.slice(0, 50).map((contact) => ({ id: contact.id, name: contact.name, channel: contact.channel, lifecycleStage: contact.lifecycleStage, tags: contact.tags })) } })
 }

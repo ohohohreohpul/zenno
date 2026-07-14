@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createWorkspace, getWorkspacesByAgency } from '@/lib/queries'
+import { requestAgencyId } from '@/lib/request-context'
 
 const createSchema = z.object({
   name: z.string().min(1).max(80),
@@ -8,10 +9,11 @@ const createSchema = z.object({
 })
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const { id: agencyId } = await params
+  const { id: requestedId } = await params
+  const agencyId = requestAgencyId(req, requestedId)
   const workspaces = await getWorkspacesByAgency(agencyId)
   return NextResponse.json({ data: workspaces })
 }
@@ -20,7 +22,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const { id: agencyId } = await params
+  const { id: requestedId } = await params
+  const agencyId = requestAgencyId(req, requestedId)
 
   let body: unknown
   try { body = await req.json() } catch {

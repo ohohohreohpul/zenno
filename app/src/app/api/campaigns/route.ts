@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createCampaign, getCampaigns } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
 const audienceSchema = z.object({
@@ -39,7 +40,7 @@ const createSchema = z.object({
 ).refine((d) => d.campaignType === 'manual' || Boolean(d.triggerStage), { message: 'Triggered campaigns require a stage', path: ['triggerStage'] })
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1')
 
   if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
   return NextResponse.json({ data: await getCampaigns(workspaceId) })
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, name, campaignType, triggerStage, audience, followUpDelaysDays, goal, flow } = parsed.data
+  const { name, campaignType, triggerStage, audience, followUpDelaysDays, goal, flow } = parsed.data
+  const workspaceId = requestWorkspaceId(req, parsed.data.workspaceId)
   const goalText = goal ?? ''
   const flowArr = flow ?? []
 

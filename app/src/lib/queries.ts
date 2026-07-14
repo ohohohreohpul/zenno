@@ -109,6 +109,24 @@ export async function getUserByEmail(email: string) {
   return fromDb(data)
 }
 
+export async function provisionAuthenticatedUser(params: {
+  authUserId: string
+  email: string
+  name: string
+  businessName: string
+}) {
+  if (IS_MOCK) return { agencyId: 'agency-1', workspaceId: 'ws-1', userName: params.name }
+  const { data, error } = await ensureSupa().rpc('provision_authenticated_user', {
+    auth_user_id_param: params.authUserId,
+    email_param: params.email.toLowerCase(),
+    name_param: params.name,
+    business_name_param: params.businessName,
+  })
+  if (error) throw error
+  const row = Array.isArray(data) ? data[0] : data
+  return fromDb(row as Record<string, unknown> | null)
+}
+
 // ── Contacts ────────────────────────────────────────────────────────────────
 
 export async function getContacts(workspaceId: string) {
@@ -703,6 +721,16 @@ export async function getCommentAutomations(workspaceId: string) {
   const { data, error } = await ensureSupa().from('comment_automations').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false })
   if (error) throw error
   return fromDbArr(data)
+}
+
+export async function getCommentAutomation(id: string) {
+  if (IS_MOCK) {
+    const item = MockDB.getCommentAutomations('ws-1').find((automation) => automation._id === id)
+    return item ? { ...item, id: item._id } : null
+  }
+  const { data, error } = await ensureSupa().from('comment_automations').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return fromDb(data)
 }
 
 export async function createCommentAutomation(data: Record<string, unknown>) {

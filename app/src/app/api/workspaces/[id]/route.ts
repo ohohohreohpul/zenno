@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getWorkspace, updateWorkspace } from '@/lib/queries'
 import { validTimeZone } from '@/lib/business-hours'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const businessHoursSchema = z.object({
   days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
@@ -17,14 +18,16 @@ const patchSchema = z.object({
   businessHours: businessHoursSchema.optional(),
 }).refine((value) => Object.keys(value).length > 0, 'No changes supplied')
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: requestedId } = await params
+  const id = requestWorkspaceId(req, requestedId)
   const workspace = await getWorkspace(id)
   return workspace ? NextResponse.json({ data: workspace }) : NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+  const { id: requestedId } = await params
+  const id = requestWorkspaceId(req, requestedId)
   let body: unknown
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const parsed = patchSchema.safeParse(body)

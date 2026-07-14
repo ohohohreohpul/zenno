@@ -33,3 +33,13 @@ export function isSupabaseConfigured(): boolean {
         (process.env.SUPABASE_PUBLISHABLE_KEY && process.env.AUTH_SECRET)),
   )
 }
+
+/** A fresh, unprivileged client for password signup/signin requests. */
+export function createSupabaseAuthClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY
+  if (!url || !publishableKey) throw new Error('Supabase Auth is not configured')
+  return createClient(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  })
+}

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createTask, getTasks } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
 
   return NextResponse.json({ data: await getTasks(workspaceId) })
 }
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   const { dueDate, ...rest } = parsed.data
-  const taskData = { ...rest, dueDate: dueDate ? new Date(dueDate) : null }
+  const taskData = { ...rest, workspaceId: requestWorkspaceId(req, rest.workspaceId), dueDate: dueDate ? new Date(dueDate) : null }
 
   return NextResponse.json({ data: await createTask(taskData) }, { status: 201 })
 }

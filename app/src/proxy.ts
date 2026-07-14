@@ -21,7 +21,11 @@ export function proxy(request: NextRequest): NextResponse {
     return NextResponse.redirect(loginUrl)
   }
 
-  return NextResponse.next()
+  const headers = new Headers(request.headers)
+  headers.set('x-zenno-user-id', session.userId)
+  headers.set('x-zenno-agency-id', session.agencyId)
+  headers.set('x-zenno-workspace-id', session.workspaceId)
+  return NextResponse.next({ request: { headers } })
 }
 
 export const config = {

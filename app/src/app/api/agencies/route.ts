@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAgency } from '@/lib/queries'
+import { getRequestTenant } from '@/lib/request-context'
 
 const createSchema = z.object({
   name: z.string().min(1).max(80),
@@ -18,7 +19,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { name, slug, ownerId, brandColor } = parsed.data
+  const { name, slug, brandColor } = parsed.data
+  const ownerId = getRequestTenant(req)?.userId
+  if (!ownerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const agency = await createAgency({

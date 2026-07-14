@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContacts, getLastMessage } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 interface ContactRow { id: string; workspaceId: string; externalId: string; channel: string; name: string | null; phone?: string; instagramHandle?: string; lifecycleStage: string; tags?: string[]; botActive?: boolean; dnd?: boolean; chatStatus?: string; attentionRequired?: boolean; notes?: string; unread?: number; createdAt: string; updatedAt: string }
 interface MessageRow { id: string; content: string; direction: string; createdAt: string }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1')
   const contacts = (await getContacts(workspaceId) as unknown as ContactRow[]).slice(0, 100)
   const data = await Promise.all(contacts.map(async (c) => {
     const last = await getLastMessage(c.id) as MessageRow | null

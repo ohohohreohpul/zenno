@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAppointment, getAppointments } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
 
   return NextResponse.json({ data: await getAppointments(workspaceId) })
 }
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   const { startsAt, ...rest } = parsed.data
-  const apptData = { ...rest, startsAt: new Date(startsAt) }
+  const apptData = { ...rest, workspaceId: requestWorkspaceId(req, rest.workspaceId), startsAt: new Date(startsAt) }
 
   return NextResponse.json({ data: await createAppointment(apptData) }, { status: 201 })
 }

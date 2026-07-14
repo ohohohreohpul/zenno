@@ -22,7 +22,7 @@ import { DEFAULT_SEND_LIMITS, type IChannelConnection } from '@/models/ChannelCo
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 function workspaceIdFrom(req: NextRequest): string {
-  return req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  return req.headers.get('x-zenno-workspace-id') ?? req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
 }
 
 function instanceNameFor(workspaceId: string): string {

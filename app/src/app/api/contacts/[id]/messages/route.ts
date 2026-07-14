@@ -6,15 +6,16 @@ import { deliverMessage } from '@/lib/transport'
 import { guardrailsToPrompt } from '@/lib/guardrails'
 import { createMessage, getAiConfig, getContact, getMessages, getWorkspace, updateContact } from '@/lib/queries'
 import type { IGuardrails } from '@/models/WorkspaceAiConfig'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 interface ContactRecord { id: string; workspaceId: string; externalId: string; channel: string; name: string | null; lifecycleStage: string; botActive: boolean; memorySummary?: string }
 interface MessageRecord { id: string; contactId: string; channel: string; direction: 'inbound' | 'outbound'; content: string; aiGenerated: boolean; createdAt: string | Date }
 
-export async function GET(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+export async function GET(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
   const [contact, messages] = await Promise.all([getContact(id), getMessages(id)]) as [ContactRecord | null, MessageRecord[]]
-  if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+  if (!contact || contact.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   return NextResponse.json({
     contact: { id: contact.id, workspace_id: contact.workspaceId, external_id: contact.externalId, channel: contact.channel, name: contact.name, lifecycle_stage: contact.lifecycleStage },
     messages: messages.map((m) => ({ id: m.id, contact_id: m.contactId, channel: m.channel, direction: m.direction, content: m.content, ai_generated: m.aiGenerated, created_at: m.createdAt })),
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   const contact = await getContact(contactId) as ContactRecord | null
-  if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+  if (!contact || contact.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   const isCustomer = parsed.data.as === 'customer'
   const msg = await createMessage({ workspaceId: contact.workspaceId, contactId, channel: contact.channel, direction: isCustomer ? 'inbound' : 'outbound', content: parsed.data.content, aiGenerated: false })
 

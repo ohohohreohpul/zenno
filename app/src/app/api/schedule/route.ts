@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createScheduleSlot, deleteScheduleSlot, getScheduleSlots } from '@/lib/queries'
+import { createScheduleSlot, deleteScheduleSlot, getScheduleSlot, getScheduleSlots } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const createSchema = z.object({
   workspaceId: z.string().min(1).default('ws-1'),
@@ -13,7 +14,7 @@ const createSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1')
   return NextResponse.json({ data: await getScheduleSlots(workspaceId) })
 }
 
@@ -22,12 +23,14 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
-  return NextResponse.json({ data: await createScheduleSlot({ ...parsed.data, booked: 0 }) }, { status: 201 })
+  return NextResponse.json({ data: await createScheduleSlot({ ...parsed.data, workspaceId: requestWorkspaceId(req, parsed.data.workspaceId), booked: 0 }) }, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  const slot = await getScheduleSlot(id) as { workspaceId?: string } | null
+  if (!slot || slot.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Schedule slot not found' }, { status: 404 })
   await deleteScheduleSlot(id)
   return NextResponse.json({ ok: true })
 }

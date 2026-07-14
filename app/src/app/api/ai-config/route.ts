@@ -3,11 +3,12 @@ import { z } from 'zod'
 import { getAiConfig, upsertAiConfig } from '@/lib/queries'
 import { DEFAULT_GUARDRAILS } from '@/lib/guardrails'
 import { getLlmRuntime } from '@/lib/llm'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
 
   const config = await getAiConfig(workspaceId) as { systemPrompt?: string; knowledgeSummary?: string; guardrails?: unknown }
   return NextResponse.json({
@@ -46,7 +47,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   const parsed = updateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, systemPrompt, knowledgeSummary, guardrails } = parsed.data
+  const { systemPrompt, knowledgeSummary, guardrails } = parsed.data
+  const workspaceId = requestWorkspaceId(req, parsed.data.workspaceId)
   if (!systemPrompt && knowledgeSummary === undefined && !guardrails) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 422 })
   }

@@ -20,6 +20,8 @@ export interface SessionPayload {
   userId: string
   email: string
   name: string
+  agencyId: string
+  workspaceId: string
 }
 
 interface SessionClaims extends SessionPayload {
@@ -81,8 +83,8 @@ export function verifySessionToken(token: string): SessionPayload | null {
   try {
     const claims = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as SessionClaims
     if (typeof claims.exp !== 'number' || claims.exp < Math.floor(Date.now() / 1000)) return null
-    if (!claims.userId || !claims.email || !claims.name) return null
-    return { userId: claims.userId, email: claims.email, name: claims.name }
+    if (!claims.userId || !claims.email || !claims.name || !claims.agencyId || !claims.workspaceId) return null
+    return { userId: claims.userId, email: claims.email, name: claims.name, agencyId: claims.agencyId, workspaceId: claims.workspaceId }
   } catch {
     return null
   }

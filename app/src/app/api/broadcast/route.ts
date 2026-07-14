@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { generateReplyCore, hasAiKey } from '@/lib/ai'
 import { createCampaign, getContacts } from '@/lib/queries'
 import { queueContactsForCampaign } from '@/lib/campaign-runner'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 const MAX_RECIPIENTS = 50
@@ -50,7 +51,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = requestSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, stages, tags, instruction, mode } = parsed.data
+  const { stages, tags, instruction, mode } = parsed.data
+  const workspaceId = requestWorkspaceId(req, parsed.data.workspaceId)
 
   const recipients = await findRecipients(workspaceId, stages, tags)
 

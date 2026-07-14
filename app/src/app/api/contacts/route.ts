@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContacts } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1')
 
   const contacts = await getContacts(workspaceId) as unknown as Array<Record<string, unknown>>
   const data = contacts.map((c) => ({

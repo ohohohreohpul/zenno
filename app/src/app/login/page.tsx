@@ -30,27 +30,39 @@ const inputStyle: React.CSSProperties = {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [name, setName] = useState('')
+  const [businessName, setBusinessName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setIsSubmitting(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(mode === 'signup' ? '/api/auth/signup' : '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(mode === 'signup' ? { name, businessName, email, password } : { email, password }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
-        setError(body?.error ?? 'Invalid email or password')
+        setError(body?.error ?? (mode === 'signup' ? 'Could not create account' : 'Invalid email or password'))
+        return
+      }
+      const body = await res.json()
+      if (body.data?.pendingConfirmation) {
+        setSuccess(body.data.message)
+        setMode('login')
         return
       }
       router.push(searchParams.get('next') ?? '/dashboard')
+      router.refresh()
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -102,10 +114,18 @@ function LoginForm() {
               margin: '0 0 28px',
             }}
           >
-            Welcome back
+            {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h1>
 
           <form onSubmit={handleSubmit}>
+            {mode === 'signup' && (
+              <>
+                <label htmlFor="name" style={{ display: 'block', fontSize: 13, color: COLORS.textSecondary, marginBottom: 6 }}>Your name</label>
+                <input id="name" required minLength={2} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
+                <label htmlFor="business" style={{ display: 'block', fontSize: 13, color: COLORS.textSecondary, marginBottom: 6 }}>Business name</label>
+                <input id="business" required minLength={2} autoComplete="organization" value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
+              </>
+            )}
             <label
               htmlFor="email"
               style={{ display: 'block', fontSize: 13, color: COLORS.textSecondary, marginBottom: 6 }}
@@ -132,7 +152,8 @@ function LoginForm() {
               id="password"
               type="password"
               required
-              autoComplete="current-password"
+              minLength={mode === 'signup' ? 8 : 1}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{ ...inputStyle, marginBottom: 24 }}
@@ -143,6 +164,7 @@ function LoginForm() {
                 {error}
               </p>
             )}
+            {success && <p style={{ fontSize: 13, color: '#15803D', margin: '0 0 16px', lineHeight: 1.5 }} role="status">{success}</p>}
 
             <button
               type="submit"
@@ -160,9 +182,15 @@ function LoginForm() {
                 opacity: isSubmitting ? 0.7 : 1,
               }}
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? (mode === 'signup' ? 'Creating account…' : 'Signing in…') : (mode === 'signup' ? 'Create account' : 'Sign in')}
             </button>
           </form>
+          <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: COLORS.textSecondary }}>
+            {mode === 'signup' ? 'Already have an account?' : 'New to Zenno?'}{' '}
+            <button type="button" onClick={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError(null); setSuccess(null) }} style={{ border: 'none', background: 'transparent', padding: 0, color: COLORS.textPrimary, fontWeight: 600, cursor: 'pointer' }}>
+              {mode === 'signup' ? 'Sign in' : 'Create account'}
+            </button>
+          </div>
         </section>
 
       </div>

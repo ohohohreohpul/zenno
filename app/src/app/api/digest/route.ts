@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { IS_MOCK, MockDB } from '@/lib/mock-store'
 import { getAppointments, getContacts, getMessages } from '@/lib/queries'
 import { hasAiKey } from '@/lib/ai'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
@@ -39,7 +40,7 @@ function dayBounds(dateParam: string | null): { start: Date; end: Date; label: s
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
   const { start, end, label } = dayBounds(req.nextUrl.searchParams.get('date'))
 
   const data = IS_MOCK

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { updateCommentAutomation } from '@/lib/queries'
+import { getCommentAutomation, updateCommentAutomation } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -21,6 +22,8 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
+  const existing = await getCommentAutomation(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Automation not found' }, { status: 404 })
   const updated = await updateCommentAutomation(id, parsed.data)
   if (!updated) return NextResponse.json({ error: 'Automation not found' }, { status: 404 })
   return NextResponse.json({ data: updated })

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createDeal, getDeals } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
 
   return NextResponse.json({ data: await getDeals(workspaceId) })
 }
@@ -29,5 +30,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  return NextResponse.json({ data: await createDeal(parsed.data) }, { status: 201 })
+  return NextResponse.json({ data: await createDeal({ ...parsed.data, workspaceId: requestWorkspaceId(req, parsed.data.workspaceId) }) }, { status: 201 })
 }

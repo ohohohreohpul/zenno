@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server'
 export const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export function workspaceIdFrom(req: NextRequest): string {
-  return req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  return req.headers.get('x-zenno-workspace-id') ?? req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
 }
 
 /** Public base URL of this app — used when registering webhooks with platforms. */

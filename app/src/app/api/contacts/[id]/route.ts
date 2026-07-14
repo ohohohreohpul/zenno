@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getContact, updateContact } from '@/lib/queries'
 import { triggerCampaignsForStage } from '@/lib/campaign-runner'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -26,7 +27,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const previous = await getContact(id) as unknown as { lifecycleStage?: string } | null
+  const previous = await getContact(id) as unknown as { lifecycleStage?: string; workspaceId?: string } | null
+  if (!previous || previous.workspaceId !== requestWorkspaceId(req)) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+  }
   const updated = await updateContact(id, parsed.data) as unknown as { id: string; workspaceId: string; lifecycleStage: string; name: string | null; channel: string } | null
   if (!updated) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   await fireStageCampaigns(previous?.lifecycleStage, updated.lifecycleStage, {

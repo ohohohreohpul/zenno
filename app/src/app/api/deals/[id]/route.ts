@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { deleteDeal, getDeal, updateDeal } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -22,15 +23,18 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
+  const existing = await getDeal(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
   const updated = await updateDeal(id, parsed.data)
   if (!updated) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
   return NextResponse.json({ data: updated })
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+export async function DELETE(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
 
-  if (!await getDeal(id)) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
+  const existing = await getDeal(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
   await deleteDeal(id)
   return NextResponse.json({ data: { id } })
 }

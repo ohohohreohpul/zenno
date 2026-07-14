@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCampaign, updateCampaign } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
 const audienceSchema = z.object({
@@ -38,9 +39,11 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   const update: Record<string, unknown> = { ...parsed.data }
+  delete update.workspaceId
   if ('triggerStage' in update) update.triggerStage = parsed.data.triggerStage ?? null
 
-  if (!await getCampaign(id)) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+  const existing = await getCampaign(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
   const campaign = await updateCampaign(id, update)
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
   return NextResponse.json({ data: campaign })

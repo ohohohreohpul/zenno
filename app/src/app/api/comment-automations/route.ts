@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createCommentAutomation, getCommentAutomations } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
+  const workspaceId = requestWorkspaceId(req, req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID)
 
   return NextResponse.json({ data: await getCommentAutomations(workspaceId) })
 }
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const created = await createCommentAutomation({
     ...parsed.data,
+    workspaceId: requestWorkspaceId(req, parsed.data.workspaceId),
     stats: { commentsCaptured: 0, dmsSent: 0, booked: 0 },
   })
   return NextResponse.json({ data: created }, { status: 201 })

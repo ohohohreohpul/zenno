@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateReplyCore, hasAiKey, type ChatTurn } from '@/lib/ai'
 import { IS_MOCK, MockDB } from '@/lib/mock-store'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 const requestSchema = z.object({
   workspaceId: z.string().min(1).default('ws-1'),
@@ -21,7 +22,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = requestSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, history, message, systemPrompt } = parsed.data
+  const { history, message, systemPrompt } = parsed.data
+  const workspaceId = requestWorkspaceId(req, parsed.data.workspaceId)
 
   if (!hasAiKey()) {
     return NextResponse.json({

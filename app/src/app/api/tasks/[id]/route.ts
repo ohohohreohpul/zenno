@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { deleteTask, getTask, updateTask } from '@/lib/queries'
+import { requestWorkspaceId } from '@/lib/request-context'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -27,15 +28,18 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     ? { ...rest, dueDate: dueDate ? new Date(dueDate) : null }
     : rest
 
+  const existing = await getTask(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
   const updated = await updateTask(id, patch)
   if (!updated) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
   return NextResponse.json({ data: updated })
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+export async function DELETE(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
 
-  if (!await getTask(id)) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  const existing = await getTask(id) as { workspaceId?: string } | null
+  if (!existing || existing.workspaceId !== requestWorkspaceId(req)) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
   await deleteTask(id)
   return NextResponse.json({ data: { id } })
 }

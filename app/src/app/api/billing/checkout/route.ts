@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createCheckoutSession, CreditPackId } from '@/lib/stripe'
+import { requestAgencyId } from '@/lib/request-context'
 
 const schema = z.object({
   agencyId: z.string().uuid(),
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
   }
 
-  const { agencyId, packId } = parsed.data
+  const { packId } = parsed.data
+  const agencyId = requestAgencyId(req, parsed.data.agencyId)
   const origin = req.nextUrl.origin
 
   try {
