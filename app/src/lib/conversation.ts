@@ -96,9 +96,10 @@ async function generateReplyWithTools(
   contactId: string,
   incomingText: string,
 ): Promise<string | null> {
-  const [config, recent] = await Promise.all([
+  const [config, recent, workspace] = await Promise.all([
     getAiConfig(workspaceId),
     getRecentMessages(contactId, HISTORY_LIMIT),
+    getWorkspace(workspaceId),
   ])
 
   const cfg = config as { systemPrompt?: string; guardrails?: IGuardrails; knowledgeSummary?: string }
@@ -125,6 +126,8 @@ async function generateReplyWithTools(
       contactId,
       contactName: contact.name ?? 'Customer',
       channel: contact.channel,
+      timezone: (workspace as { timezone?: string } | null)?.timezone ?? 'UTC',
+      currency: (workspace as { currency?: string } | null)?.currency ?? 'USD',
     })
     return result.reply || null
   } catch (error) {

@@ -3,12 +3,26 @@ import { z } from 'zod'
 import { getCampaign, updateCampaign } from '@/lib/queries'
 
 const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
+const audienceSchema = z.object({
+  stages: z.array(lifecycleEnum).max(7), tags: z.array(z.string().min(1).max(40)).max(20),
+  inactiveDays: z.number().int().min(1).max(3650).nullable(), lostOnly: z.boolean(),
+  contactIds: z.array(z.string().min(1)).max(1000), resumeBot: z.boolean(),
+})
+const flowNodeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('message'), content: z.string().min(1), channel: z.enum(['whatsapp','instagram','line','webchat','sms','email']).optional() }),
+  z.object({ type: z.literal('wait'), delayMs: z.number().int().min(0) }),
+  z.object({ type: z.literal('exit') }),
+])
 
 const patchSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   name: z.string().min(1).max(120).optional(),
+  campaignType: z.enum(['manual','triggered']).optional(),
   triggerStage: lifecycleEnum.nullable().optional(),
+  audience: audienceSchema.optional(),
+  followUpDelaysDays: z.array(z.number().int().min(1).max(90)).max(3).optional(),
   goal: z.string().max(4000).optional(),
+  flow: z.array(flowNodeSchema).optional(),
   status: z.enum(['draft','active','paused','completed']).optional(),
 })
 

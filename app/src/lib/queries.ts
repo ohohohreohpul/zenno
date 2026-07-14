@@ -193,6 +193,22 @@ export async function getMessages(contactId: string) {
   return fromDbArr(data)
 }
 
+export async function hasInboundMessage(contactId: string): Promise<boolean> {
+  if (IS_MOCK) return MockDB.getMessages(contactId).some((m) => m.direction === 'inbound')
+  const { data, error } = await ensureSupa().from('messages').select('id')
+    .eq('contact_id', contactId).eq('direction', 'inbound').limit(1).maybeSingle()
+  if (error) throw error
+  return Boolean(data)
+}
+
+export async function hasInboundMessageAfter(contactId: string, after: Date | string): Promise<boolean> {
+  if (IS_MOCK) return MockDB.getMessages(contactId).some((message) => message.direction === 'inbound' && new Date(message.createdAt).getTime() > new Date(after).getTime())
+  const { data, error } = await ensureSupa().from('messages').select('id')
+    .eq('contact_id', contactId).eq('direction', 'inbound').gt('created_at', new Date(after).toISOString()).limit(1).maybeSingle()
+  if (error) throw error
+  return Boolean(data)
+}
+
 export async function getRecentMessages(contactId: string, limit = 20) {
   if (IS_MOCK) {
     return MockDB.getMessages(contactId).slice(-limit).map((m) => ({ ...m, id: m._id }))
@@ -371,6 +387,41 @@ export async function getScheduleSlot(id: string) {
   return fromDb(data)
 }
 
+export async function createScheduleSlot(data: Record<string, unknown>) {
+  if (IS_MOCK) return { id: `slot-${Date.now()}`, ...data }
+  const { data: row, error } = await ensureSupa().from('schedule_slots').insert(toDb(data)).select().single()
+  if (error) throw error
+  return fromDb(row)
+}
+
+export async function deleteScheduleSlot(id: string) {
+  if (IS_MOCK) return true
+  const { error } = await ensureSupa().from('schedule_slots').delete().eq('id', id)
+  if (error) throw error
+  return true
+}
+
+export async function bookScheduleSlot(params: {
+  slotId: string
+  startsAt: Date
+  contactId: string
+  contactName: string
+  channel: string
+  kind: string
+}) {
+  if (IS_MOCK) return null
+  const { data, error } = await ensureSupa().rpc('book_schedule_slot', {
+    slot_id_param: params.slotId,
+    starts_at_param: params.startsAt.toISOString(),
+    contact_id_param: params.contactId,
+    contact_name_param: params.contactName,
+    channel_param: params.channel,
+    kind_param: params.kind,
+  })
+  if (error) throw error
+  return fromDb(data as Record<string, unknown> | null)
+}
+
 export async function incrementSlotBooking(id: string) {
   if (IS_MOCK) {
     const s = MockDB.incrementSlotBooking(id)
@@ -433,6 +484,107 @@ export async function getEnrollment(campaignId: string, contactId: string) {
   const { data, error } = await ensureSupa().from('campaign_enrollments').select('*').eq('campaign_id', campaignId).eq('contact_id', contactId).maybeSingle()
   if (error) throw error
   return fromDb(data)
+}
+
+export async function enqueueCampaignEnrollment(
+  campaignId: string,
+  contactId: string,
+  messageContent?: string,
+  runId?: string | null,
+): Promise<{ created: boolean; enrollment: Record<string, unknown> | null }> {
+  if (IS_MOCK) return { created: true, enrollment: { id: `enrollment-${campaignId}-${contactId}`, campaignId, runId, contactId, deliveryStatus: 'queued', messageContent } }
+  const { data, error } = await ensureSupa().from('campaign_enrollments').insert({
+    campaign_id: campaignId,
+    run_id: runId ?? null,
+    contact_id: contactId,
+    status: 'active',
+    delivery_status: 'queued',
+    next_run_at: new Date().toISOString(),
+    message_content: messageContent || null,
+  }).select().single()
+  if (error?.code === '23505') {
+    return { created: false, enrollment: await getEnrollment(campaignId, contactId) }
+  }
+  if (error) throw error
+  return { created: true, enrollment: fromDb(data) }
+}
+
+export async function claimCampaignEnrollments(batchSize = 1) {
+  if (IS_MOCK) return []
+  const { data, error } = await ensureSupa().rpc('claim_campaign_enrollments', {
+    batch_size_param: Math.max(1, Math.min(batchSize, 10)),
+  })
+  if (error) throw error
+  return fromDbArr(data as Record<string, unknown>[] | null)
+}
+
+export async function getCampaignDeliveryStats(campaignId: string) {
+  if (IS_MOCK) return { queued: 0, sending: 0, retry: 0, delivered: 0, failed: 0, skipped: 0 }
+  const { data, error } = await ensureSupa().from('campaign_enrollments').select('delivery_status').eq('campaign_id', campaignId)
+  if (error) throw error
+  const counts = { queued: 0, sending: 0, retry: 0, delivered: 0, failed: 0, skipped: 0 }
+  for (const row of data ?? []) {
+    const status = row.delivery_status as keyof typeof counts
+    if (status in counts) counts[status] += 1
+  }
+  return counts
+}
+
+export async function getCampaignRunDeliveryStats(runId: string) {
+  if (IS_MOCK) return { queued: 0, sending: 0, retry: 0, delivered: 0, failed: 0, skipped: 0 }
+  const { data, error } = await ensureSupa().from('campaign_enrollments').select('delivery_status').eq('run_id', runId)
+  if (error) throw error
+  const counts = { queued: 0, sending: 0, retry: 0, delivered: 0, failed: 0, skipped: 0 }
+  for (const row of data ?? []) {
+    const status = row.delivery_status as keyof typeof counts
+    if (status in counts) counts[status] += 1
+  }
+  return counts
+}
+
+export async function createCampaignRun(campaignId: string) {
+  if (IS_MOCK) return { id: `run-${Date.now()}`, campaignId, status: 'queued' }
+  const { data, error } = await ensureSupa().from('campaign_runs').insert({ campaign_id: campaignId, status: 'queued' }).select().single()
+  if (error) throw error
+  return fromDb(data) as Record<string, unknown>
+}
+
+export async function getActiveCampaignRun(campaignId: string) {
+  if (IS_MOCK) return null
+  const { data, error } = await ensureSupa().from('campaign_runs').select('*').eq('campaign_id', campaignId)
+    .in('status', ['queued', 'running']).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return fromDb(data)
+}
+
+export async function updateCampaignRun(id: string, patch: Record<string, unknown>) {
+  if (IS_MOCK) return { id, ...patch }
+  const { data, error } = await ensureSupa().from('campaign_runs').update(toDb(patch)).eq('id', id).select().maybeSingle()
+  if (error) throw error
+  return fromDb(data)
+}
+
+export async function findCampaignAudience(workspaceId: string, audience: {
+  stages?: string[]
+  tags?: string[]
+  inactiveDays?: number | null
+  lostOnly?: boolean
+  contactIds?: string[]
+}) {
+  if (IS_MOCK) {
+    const contacts = MockDB.getContacts(workspaceId)
+    return contacts.filter((contact) => !contact.dnd).map((contact) => ({ ...contact, id: contact._id }))
+  }
+  const { data, error } = await ensureSupa().rpc('find_campaign_audience', {
+    workspace_id_param: workspaceId,
+    stages_param: audience.stages ?? [],
+    tags_param: audience.tags ?? [],
+    inactive_days_param: audience.inactiveDays ?? null,
+    lost_only_param: audience.lostOnly ?? false,
+    contact_ids_param: audience.contactIds ?? [],
+  })
+  if (error) throw error
+  return fromDbArr(data as Record<string, unknown>[] | null)
 }
 
 export async function getEnrollmentById(id: string) {
@@ -518,30 +670,23 @@ export async function upsertChannelConnection(workspaceId: string, channel: stri
   return createChannelConnection({ workspaceId, channel, ...merged })
 }
 
-export async function reserveChannelSend(id: string, today: string, cap: number): Promise<boolean> {
+export async function reserveChannelSend(
+  id: string,
+  today: string,
+  messageCap: number,
+  isNewContact: boolean,
+  newContactCap: number,
+): Promise<boolean> {
   if (IS_MOCK) return true
-  const supabase = ensureSupa()
-  const { data: current, error: readError } = await supabase
-    .from('channel_connections')
-    .select('sent_date, sent_today')
-    .eq('id', id)
-    .maybeSingle()
-  if (readError) throw readError
-  if (!current) return false
-  const count = current.sent_date === today ? Number(current.sent_today ?? 0) : 0
-  if (count >= cap) return false
-  let query = supabase
-    .from('channel_connections')
-    .update({ sent_date: today, sent_today: count + 1, last_sent_at: new Date().toISOString() })
-    .eq('id', id)
-  query = current.sent_date === today
-    ? query.eq('sent_today', count)
-    : current.sent_date === null
-      ? query.is('sent_date', null)
-      : query.eq('sent_date', current.sent_date)
-  const { data, error } = await query.select('id').maybeSingle()
+  const { data, error } = await ensureSupa().rpc('reserve_channel_send', {
+    connection_id_param: id,
+    send_date_param: today,
+    message_cap_param: messageCap,
+    is_new_contact_param: isNewContact,
+    new_contact_cap_param: newContactCap,
+  })
   if (error) throw error
-  return Boolean(data)
+  return data === true
 }
 
 export async function findChannelConnectionByEmbedKey(embedKey: string) {

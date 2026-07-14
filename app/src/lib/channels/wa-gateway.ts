@@ -40,8 +40,12 @@ async function gatewayFetch(
     headers: {
       'Content-Type': 'application/json',
       apikey: apiKey,
+      // Evolution applies its CORS allowlist even to server-to-server calls.
+      Origin: process.env.PUBLIC_APP_URL ?? 'https://zen-agent.vercel.app',
     },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(15_000),
   })
 
   const text = await res.text()
@@ -62,9 +66,12 @@ function webhookUrl(): string | null {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : null)
   if (!base) return null
+  return `${base.replace(/\/$/, '')}/api/webhooks/wa-gateway`
+}
+
+function webhookHeaders(): Record<string, string> | undefined {
   const token = process.env.WA_GATEWAY_WEBHOOK_TOKEN
-  const url = `${base.replace(/\/$/, '')}/api/webhooks/wa-gateway`
-  return token ? `${url}?token=${encodeURIComponent(token)}` : url
+  return token ? { 'x-zenno-webhook-token': token } : undefined
 }
 
 function extractQr(payload: Record<string, unknown>): QrResult {
@@ -78,7 +85,7 @@ function extractQr(payload: Record<string, unknown>): QrResult {
  * Create a gateway instance for a workspace and register our webhook.
  * Returns the initial QR when the gateway includes one.
  */
-export async function createInstance(instanceName: string): Promise<QrResult> {
+export async function createInstance(instanceName: string, phoneNumber?: string): Promise<QrResult> {
   const hook = webhookUrl()
   const payload = await gatewayFetch('/instance/create', {
     method: 'POST',
@@ -86,11 +93,13 @@ export async function createInstance(instanceName: string): Promise<QrResult> {
       instanceName,
       integration: 'WHATSAPP-BAILEYS',
       qrcode: true,
+      ...(phoneNumber ? { number: phoneNumber } : {}),
       ...(hook
         ? {
             webhook: {
               url: hook,
-              events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
+              headers: webhookHeaders(),
+              events: ['QRCODE_UPDATED', 'MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
             },
           }
         : {}),
@@ -100,8 +109,9 @@ export async function createInstance(instanceName: string): Promise<QrResult> {
 }
 
 /** Fetch a fresh QR for an existing instance (QRs expire quickly). */
-export async function fetchQr(instanceName: string): Promise<QrResult> {
-  const payload = await gatewayFetch(`/instance/connect/${encodeURIComponent(instanceName)}`)
+export async function fetchQr(instanceName: string, phoneNumber?: string): Promise<QrResult> {
+  const query = phoneNumber ? `?number=${encodeURIComponent(phoneNumber)}` : ''
+  const payload = await gatewayFetch(`/instance/connect/${encodeURIComponent(instanceName)}${query}`)
   return extractQr(payload)
 }
 

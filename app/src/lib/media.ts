@@ -108,7 +108,7 @@ async function describeImage(media: IncomingMedia, businessContext: string): Pro
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5',
+          model: process.env.OPENROUTER_MODEL ?? 'z-ai/glm-4.5-air',
           max_tokens: 200,
           messages: [
             { role: 'system', content: system },

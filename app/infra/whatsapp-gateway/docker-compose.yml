@@ -1,0 +1,121 @@
+services:
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.6
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: https://${GATEWAY_DOMAIN}
+      TELEMETRY_ENABLED: "false"
+      CORS_ORIGIN: ${ZENNO_APP_URL}
+      CORS_METHODS: GET,POST,PUT,PATCH,DELETE
+      CORS_CREDENTIALS: "true"
+      LOG_LEVEL: ERROR,WARN,INFO
+      LOG_COLOR: "false"
+      LOG_BAILEYS: error
+      DEL_INSTANCE: "false"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: zenno_gateway
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      DATABASE_SAVE_IS_ON_WHATSAPP: "true"
+      DATABASE_SAVE_IS_ON_WHATSAPP_DAYS: 7
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_TTL: 604800
+      CACHE_REDIS_PREFIX_KEY: zenno
+      CACHE_REDIS_SAVE_INSTANCES: "true"
+      CACHE_LOCAL_ENABLED: "false"
+      CONFIG_SESSION_PHONE_CLIENT: Zenno
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "false"
+      WEBHOOK_GLOBAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/',{headers:{Origin:process.env.CORS_ORIGIN}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - gateway
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - gateway
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - gateway
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      evolution:
+        condition: service_healthy
+    environment:
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - gateway
+
+volumes:
+  evolution_instances:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  gateway:
+    driver: bridge

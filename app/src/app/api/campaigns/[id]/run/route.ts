@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCampaign } from '@/lib/campaign-runner'
+import { getCampaignDeliveryStats } from '@/lib/queries'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -14,4 +15,9 @@ export async function POST(_req: NextRequest, { params }: Params): Promise<NextR
     const status = message === 'Campaign not found' ? 404 : 422
     return NextResponse.json({ error: message }, { status })
   }
+}
+
+export async function GET(_req: NextRequest, { params }: Params): Promise<NextResponse> {
+  const { id } = await params
+  return NextResponse.json({ data: await getCampaignDeliveryStats(id) })
 }

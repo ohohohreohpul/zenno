@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAiConfig, upsertAiConfig } from '@/lib/queries'
 import { DEFAULT_GUARDRAILS } from '@/lib/guardrails'
+import { getLlmRuntime } from '@/lib/llm'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       systemPrompt: config?.systemPrompt ?? '',
       knowledgeSummary: config?.knowledgeSummary ?? '',
       guardrails: config?.guardrails ?? DEFAULT_GUARDRAILS,
+      runtime: getLlmRuntime(),
+      readiness: {
+        hasPrompt: Boolean(config?.systemPrompt?.trim()),
+        hasKnowledge: Boolean(config?.knowledgeSummary?.trim()),
+      },
     },
   })
 }

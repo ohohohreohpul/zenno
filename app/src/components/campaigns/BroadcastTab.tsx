@@ -60,7 +60,7 @@ export function BroadcastTab() {
     setPhase('sending')
     try {
       const d = await callBroadcast('send')
-      setSentCount(d.data?.sent ?? 0)
+      setSentCount(d.data?.queued ?? 0)
       setPhase('sent')
     } catch {
       setError('Sending failed. Please try again.')
@@ -181,7 +181,7 @@ function ComposeColumn(props: ComposeColumnProps) {
             opacity: canSend ? 1 : 0.5,
           }}
         >
-          {phase === 'sending' ? 'Sending…' : 'Send broadcast'}
+          {phase === 'sending' ? 'Queueing…' : 'Queue broadcast'}
         </button>
       </div>
     </div>
@@ -359,9 +359,9 @@ function SentState({ sentCount, onReset }: { sentCount: number; onReset: () => v
       }}
     >
       <CheckCircle2 size={32} color="var(--stage-attended)" />
-      <div style={{ fontSize: 15, fontWeight: 600 }}>Sent to {sentCount} contacts</div>
+      <div style={{ fontSize: 15, fontWeight: 600 }}>Queued for {sentCount} contacts</div>
       <div style={{ fontSize: 13, color: 'var(--text-tertiary)', maxWidth: 300 }}>
-        Replies will land in your Chats inbox, handled by the AI agent.
+        Zenno will deliver at the safe warm-up pace. Only confirmed deliveries appear in Chats.
       </div>
       <button
         onClick={onReset}
@@ -376,7 +376,7 @@ function SentState({ sentCount, onReset }: { sentCount: number; onReset: () => v
           color: 'var(--text-primary)',
         }}
       >
-        Send another
+        Queue another
       </button>
     </div>
   )

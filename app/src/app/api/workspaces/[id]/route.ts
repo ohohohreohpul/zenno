@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getWorkspace, updateWorkspace } from '@/lib/queries'
+import { validTimeZone } from '@/lib/business-hours'
+
+const businessHoursSchema = z.object({
+  days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+})
 
 const patchSchema = z.object({
   name: z.string().min(1).max(80).optional(),
   slug: z.string().min(2).max(40).regex(/^[a-z0-9-]+$/).optional(),
+  timezone: z.string().min(1).max(80).refine(validTimeZone, 'Invalid IANA timezone').optional(),
+  currency: z.string().length(3).transform((value) => value.toUpperCase()).optional(),
+  businessHours: businessHoursSchema.optional(),
 }).refine((value) => Object.keys(value).length > 0, 'No changes supplied')
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

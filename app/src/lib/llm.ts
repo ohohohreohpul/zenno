@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { ChatTurn } from './ai'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5'
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'z-ai/glm-4.5-air'
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6'
 const DEFAULT_MAX_TOKENS = 500
 const MAX_TOOL_ROUNDS = 5
@@ -17,6 +17,12 @@ export type ToolExecutor = (name: string, input: Record<string, unknown>) => Pro
 
 export function hasLlm(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY)
+}
+
+export function getLlmRuntime() {
+  if (process.env.OPENROUTER_API_KEY) return { configured: true, provider: 'OpenRouter', model: OPENROUTER_MODEL }
+  if (process.env.ANTHROPIC_API_KEY) return { configured: true, provider: 'Anthropic', model: ANTHROPIC_MODEL }
+  return { configured: false, provider: null, model: null }
 }
 
 function usesOpenRouter(): boolean {

@@ -1,0 +1,14 @@
+{$GATEWAY_DOMAIN} {
+  encode zstd gzip
+
+  @manager path /manager*
+  respond @manager 404
+
+  reverse_proxy evolution:8080
+
+  header {
+    -Server
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+  }
+}

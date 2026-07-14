@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateReplyCore, hasAiKey } from '@/lib/ai'
-import { createMessage, getContact, getContacts } from '@/lib/queries'
-import { deliverMessage } from '@/lib/transport'
+import { createCampaign, getContacts } from '@/lib/queries'
+import { queueContactsForCampaign } from '@/lib/campaign-runner'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
 const MAX_RECIPIENTS = 50
@@ -72,20 +72,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ data: { targets, sent: 0 } })
   }
 
-  for (const t of targets) {
-      await createMessage({
-        workspaceId,
-        contactId: t.contactId,
-        channel: t.channel,
-        direction: 'outbound',
-        content: t.message,
-        aiGenerated: true,
-      })
-      const contact = await getContact(t.contactId) as { externalId?: string } | null
-      if (contact?.externalId) await deliverMessage(workspaceId, t.channel, contact.externalId, t.message, { kind: 'bulk' })
-  }
+  const campaign = await createCampaign({
+    workspaceId,
+    name: `Broadcast ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    triggerStage: null,
+    goal: instruction,
+    flow: [],
+    status: 'active',
+  }) as { id: string }
+  const prepared = new Map(targets.map((target) => [target.contactId, target.message]))
+  const result = await queueContactsForCampaign(
+    campaign.id,
+    recipients.map((contact) => ({
+      id: contact._id,
+      name: contact.name,
+      channel: contact.channel,
+      lifecycleStage: contact.lifecycleStage,
+    })),
+    prepared,
+  )
 
-  return NextResponse.json({ data: { targets, sent: targets.length } })
+  return NextResponse.json({ data: { targets, queued: result.queued, skipped: result.skipped, sent: 0 } })
 }
 
 interface BroadcastRecipient {

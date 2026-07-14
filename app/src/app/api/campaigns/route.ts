@@ -3,6 +3,14 @@ import { z } from 'zod'
 import { createCampaign, getCampaigns } from '@/lib/queries'
 
 const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
+const audienceSchema = z.object({
+  stages: z.array(lifecycleEnum).max(7).default([]),
+  tags: z.array(z.string().min(1).max(40)).max(20).default([]),
+  inactiveDays: z.number().int().min(1).max(3650).nullable().default(null),
+  lostOnly: z.boolean().default(false),
+  contactIds: z.array(z.string().min(1)).max(1000).default([]),
+  resumeBot: z.boolean().default(true),
+})
 
 const flowNodeSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('message'), content: z.string().min(1), channel: z.enum(['whatsapp','instagram','line','webchat','sms','email']).optional() }),
@@ -19,13 +27,16 @@ const flowNodeSchema = z.discriminatedUnion('type', [
 const createSchema = z.object({
   workspaceId: z.string().min(1),
   name: z.string().min(1).max(120),
+  campaignType: z.enum(['manual','triggered']).default('manual'),
   triggerStage: lifecycleEnum.optional(),
+  audience: audienceSchema.optional(),
+  followUpDelaysDays: z.array(z.number().int().min(1).max(90)).max(3).default([]),
   goal: z.string().max(4000).optional(),
   flow: z.array(flowNodeSchema).optional(),
 }).refine(
   (d) => (d.goal && d.goal.trim().length > 0) || (d.flow && d.flow.length > 0),
   { message: 'Either goal or flow is required' },
-)
+).refine((d) => d.campaignType === 'manual' || Boolean(d.triggerStage), { message: 'Triggered campaigns require a stage', path: ['triggerStage'] })
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
@@ -42,10 +53,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, name, triggerStage, goal, flow } = parsed.data
+  const { workspaceId, name, campaignType, triggerStage, audience, followUpDelaysDays, goal, flow } = parsed.data
   const goalText = goal ?? ''
   const flowArr = flow ?? []
 
-  const campaign = await createCampaign({ workspaceId, name, triggerStage: triggerStage ?? null, goal: goalText, flow: flowArr, status: 'draft' })
+  const campaign = await createCampaign({ workspaceId, name, campaignType, triggerStage: campaignType === 'triggered' ? triggerStage ?? null : null, audience: audience ?? {}, followUpDelaysDays, goal: goalText, flow: flowArr, status: 'draft' })
   return NextResponse.json({ data: campaign }, { status: 201 })
 }

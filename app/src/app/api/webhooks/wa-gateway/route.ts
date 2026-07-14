@@ -9,8 +9,9 @@ import type { IncomingMessage } from '@/types'
  * (session opened/closed) events, maps the gateway instance back to its
  * workspace, and feeds messages into the shared conversation loop.
  *
- * When WA_GATEWAY_WEBHOOK_TOKEN is set, requests must carry it as
- * ?token=... — the URL is registered with the gateway including the token.
+ * When WA_GATEWAY_WEBHOOK_TOKEN is set, requests must carry it in the
+ * x-zenno-webhook-token header. The query parameter remains accepted for
+ * instances created before header authentication was introduced.
  */
 
 interface GatewayMessageKey {
@@ -35,7 +36,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (process.env.NODE_ENV === 'production' && !expectedToken) {
     return NextResponse.json({ error: 'Webhook token is not configured' }, { status: 503 })
   }
-  if (expectedToken && req.nextUrl.searchParams.get('token') !== expectedToken) {
+  const suppliedToken =
+    req.headers.get('x-zenno-webhook-token') ??
+    req.nextUrl.searchParams.get('token')
+  if (expectedToken && suppliedToken !== expectedToken) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 
@@ -51,11 +55,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!instanceName) return NextResponse.json({ status: 'ignored' })
 
   try {
-    const conn = await getChannelConnectionByInstance(instanceName) as { id: string; workspaceId: string; warmupStartedAt?: string | Date | null } | null
+    const conn = await getChannelConnectionByInstance(instanceName) as {
+      id: string
+      workspaceId: string
+      warmupStartedAt?: string | Date | null
+      credentials?: Record<string, unknown>
+    } | null
     if (!conn) return NextResponse.json({ status: 'unknown instance' })
 
     if (event === 'connection.update') {
-      await applyConnectionUpdate(conn.id, conn.warmupStartedAt ?? null, payload.data)
+      await applyConnectionUpdate(conn, payload.data)
+      return NextResponse.json({ status: 'ok' })
+    }
+
+    if (event === 'qrcode.updated') {
+      await applyQrUpdate(conn.id, conn.credentials ?? {}, payload.data)
       return NextResponse.json({ status: 'ok' })
     }
 
@@ -79,17 +93,54 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-async function applyConnectionUpdate(connId: string, warmupStartedAt: string | Date | null, data: unknown): Promise<void> {
+async function applyConnectionUpdate(
+  conn: { id: string; phoneNumber?: string | null; warmupStartedAt?: string | Date | null; credentials?: Record<string, unknown> },
+  data: unknown,
+): Promise<void> {
   const d = (data ?? {}) as Record<string, unknown>
   const state = d.state ?? d.connection
   if (state === 'open') {
     // wuid looks like "4917612345678@s.whatsapp.net"
     const wuid = typeof d.wuid === 'string' ? d.wuid : null
     const phone = wuid ? wuid.split('@')[0] : null
-    await updateChannelConnection(connId, { status: 'connected', ...(phone ? { phoneNumber: phone } : {}), ...(!warmupStartedAt ? { warmupStartedAt: new Date() } : {}) })
+    const isNewNumber = Boolean(phone && phone !== conn.phoneNumber)
+    await updateChannelConnection(conn.id, {
+      status: 'connected',
+      ...(phone ? { phoneNumber: phone } : {}),
+      ...(!conn.warmupStartedAt || isNewNumber ? {
+        warmupStartedAt: new Date(),
+        sentDate: null,
+        sentToday: 0,
+        newContactDate: null,
+        newContactsToday: 0,
+        lastSentAt: null,
+      } : {}),
+      credentials: {
+        ...(conn.credentials ?? {}),
+        pairingQr: null,
+        pairingCode: null,
+      },
+    })
   } else if (state === 'close') {
-    await updateChannelConnection(connId, { status: 'disconnected' })
+    await updateChannelConnection(conn.id, { status: 'disconnected' })
   }
+}
+
+async function applyQrUpdate(
+  connId: string,
+  credentials: Record<string, unknown>,
+  data: unknown,
+): Promise<void> {
+  const root = (data ?? {}) as Record<string, unknown>
+  const qr = (root.qrcode ?? root) as Record<string, unknown>
+  await updateChannelConnection(connId, {
+    status: 'pending_qr',
+    credentials: {
+      ...credentials,
+      pairingQr: typeof qr.base64 === 'string' ? qr.base64 : null,
+      pairingCode: typeof qr.pairingCode === 'string' ? qr.pairingCode : null,
+    },
+  })
 }
 
 function extractMessages(data: unknown): IncomingMessage[] {

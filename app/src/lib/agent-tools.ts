@@ -3,8 +3,7 @@ import type { DealStage } from '@/models/Deal'
 import {
   getScheduleSlots,
   getScheduleSlot,
-  incrementSlotBooking,
-  createAppointment,
+  bookScheduleSlot,
   updateContact,
   findOpenDealByContact,
   createDeal,
@@ -26,17 +25,6 @@ export interface ScheduleSlotData {
   capacity: number
   booked: number
   instructor: string
-}
-
-export interface AppointmentCreateData {
-  workspaceId: string
-  contactId: string | null
-  contactName: string
-  className: string
-  startsAt: Date
-  durationMin: number
-  channel: string
-  kind: 'trial' | 'regular' | 'consult'
 }
 
 export interface ContactToolPatch {
@@ -66,8 +54,7 @@ export interface DealPatch {
 export interface AgentToolStore {
   getSchedule(workspaceId: string): Promise<ScheduleSlotData[]>
   getScheduleSlot(id: string): Promise<ScheduleSlotData | null>
-  incrementSlotBooking(id: string): Promise<ScheduleSlotData | null>
-  createAppointment(data: AppointmentCreateData): Promise<{ _id: string }>
+  bookScheduleSlot(data: { slotId: string; startsAt: Date; contactId: string; contactName: string; channel: string; kind: 'trial' | 'regular' | 'consult' }): Promise<{ _id: string } | null>
   updateContact(id: string, patch: ContactToolPatch): Promise<void>
   getOpenDealForContact(contactId: string): Promise<{ _id: string; stage: DealStage; value: number } | null>
   createDeal(data: DealCreateData): Promise<{ _id: string }>
@@ -108,13 +95,9 @@ export const dbToolStore: AgentToolStore = {
     const slot = await getScheduleSlot(id) as unknown as LeanSlot | null
     return slot ? toSlotData(slot) : null
   },
-  incrementSlotBooking: async (id) => {
-    const updated = await incrementSlotBooking(id) as unknown as LeanSlot | null
-    return updated ? toSlotData(updated) : null
-  },
-  createAppointment: async (data) => {
-    const appt = await createAppointment(data as unknown as Record<string, unknown>)
-    return { _id: String((appt as { id: string }).id) }
+  bookScheduleSlot: async (input) => {
+    const appointment = await bookScheduleSlot(input)
+    return appointment ? { _id: String((appointment as { id: string }).id) } : null
   },
   updateContact: async (id, patch) => {
     await updateContact(id, patch as unknown as Record<string, unknown>)
@@ -219,6 +202,8 @@ interface AgentContext {
   contactId: string
   contactName: string
   channel: string
+  timezone: string
+  currency: string
 }
 
 export interface AgentResult {
@@ -227,16 +212,44 @@ export interface AgentResult {
   flaggedForHuman: boolean
 }
 
-function nextOccurrence(dayOfWeek: number, time: string): Date {
-  const [hours, minutes] = time.split(':').map(Number)
-  const date = new Date()
-  const delta = (dayOfWeek - date.getDay() + 7) % 7 || 7
-  date.setDate(date.getDate() + delta)
-  date.setHours(hours, minutes, 0, 0)
-  return date
+function zonedParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return {
+    year: Number(get('year')), month: Number(get('month')), day: Number(get('day')),
+    hour: Number(get('hour')), minute: Number(get('minute')), second: Number(get('second')),
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday')),
+  }
 }
 
-function describeSlot(slot: ScheduleSlotData): object {
+function zonedDateToUtc(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {
+  const target = Date.UTC(year, month - 1, day, hour, minute)
+  let candidate = target
+  for (let i = 0; i < 3; i++) {
+    const actual = zonedParts(new Date(candidate), timeZone)
+    const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second)
+    candidate += target - actualAsUtc
+  }
+  return new Date(candidate)
+}
+
+function nextOccurrence(dayOfWeek: number, time: string, timeZone: string, now = new Date()): Date {
+  const [hour, minute] = time.split(':').map(Number)
+  const local = zonedParts(now, timeZone)
+  let delta = (dayOfWeek - local.weekday + 7) % 7
+  if (delta === 0 && hour * 60 + minute <= local.hour * 60 + local.minute) delta = 7
+  const targetDay = new Date(Date.UTC(local.year, local.month - 1, local.day + delta))
+  return zonedDateToUtc(
+    targetDay.getUTCFullYear(), targetDay.getUTCMonth() + 1, targetDay.getUTCDate(), hour, minute, timeZone,
+  )
+}
+
+function describeSlot(slot: ScheduleSlotData, timeZone: string): object {
+  const next = nextOccurrence(slot.dayOfWeek, slot.time, timeZone)
   return {
     slot_id: slot._id,
     class: slot.className,
@@ -245,7 +258,8 @@ function describeSlot(slot: ScheduleSlotData): object {
     duration_min: slot.durationMin,
     instructor: slot.instructor,
     spots_left: slot.capacity - slot.booked,
-    next_date: nextOccurrence(slot.dayOfWeek, slot.time).toDateString(),
+    next_date: new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'full' }).format(next),
+    timezone: timeZone,
   }
 }
 
@@ -261,7 +275,7 @@ async function runTool(
     const allSlots = await store.getSchedule(ctx.workspaceId)
     const slots = allSlots
       .filter((s) => !filter || s.className.toLowerCase().includes(filter))
-      .map(describeSlot)
+      .map((slot) => describeSlot(slot, ctx.timezone))
     return { schedule: slots }
   }
 
@@ -269,21 +283,17 @@ async function runTool(
     const slotId = typeof input.slot_id === 'string' ? input.slot_id : ''
     const slot = await store.getScheduleSlot(slotId)
     if (!slot) return { error: 'Unknown slot_id. Call check_schedule first.' }
-    const updated = await store.incrementSlotBooking(slotId)
-    if (!updated) return { error: 'That class is full. Offer another slot.' }
-
     const kind = input.kind === 'regular' || input.kind === 'consult' ? input.kind : 'trial'
-    const startsAt = nextOccurrence(slot.dayOfWeek, slot.time)
-    const appt = await store.createAppointment({
-      workspaceId: ctx.workspaceId,
+    const startsAt = nextOccurrence(slot.dayOfWeek, slot.time, ctx.timezone)
+    const appt = await store.bookScheduleSlot({
+      slotId,
       contactId: ctx.contactId,
       contactName: ctx.contactName,
-      className: kind === 'trial' ? `${slot.className} (Trial)` : slot.className,
       startsAt,
-      durationMin: slot.durationMin,
       channel: ctx.channel,
       kind,
     })
+    if (!appt) return { error: 'That occurrence is full. Offer another slot.' }
     if (kind === 'trial') {
       await store.updateContact(ctx.contactId, { lifecycleStage: 'trial_booked' })
       try {
@@ -303,7 +313,8 @@ async function runTool(
       class: slot.className,
       day: DAY_NAMES[slot.dayOfWeek],
       time: slot.time,
-      date: startsAt.toDateString(),
+      date: new Intl.DateTimeFormat('en-US', { timeZone: ctx.timezone, dateStyle: 'full' }).format(startsAt),
+      timezone: ctx.timezone,
       instructor: slot.instructor,
     }
   }
@@ -319,11 +330,11 @@ async function runTool(
       contactName: ctx.contactName,
       name: dealName,
       value,
-      currency: 'THB',
+      currency: ctx.currency,
       stage,
       channel: ctx.channel,
     })
-    return { created: true, deal_id: deal._id, name: dealName, value, stage }
+    return { created: true, deal_id: deal._id, name: dealName, value, currency: ctx.currency, stage }
   }
 
   if (name === 'update_deal') {

@@ -1,5 +1,5 @@
 import { IS_MOCK } from './mock-store'
-import { getChannelConnection } from './queries'
+import { findContactByExternal, getChannelConnection, hasInboundMessage } from './queries'
 import { sendWhatsApp } from './channels/whatsapp'
 import { sendInstagram } from './channels/instagram'
 import { sendLine, sendLinePush } from './channels/line'
@@ -76,7 +76,13 @@ export async function deliverMessage(
         if (isGatewayConfigured()) {
           const conn = await findConnection(workspaceId, 'whatsapp')
           if (conn) {
-            const reservation = await tryReserveSend(conn, options.kind ?? 'reply')
+            const kind = options.kind ?? 'reply'
+            let isNewContact = false
+            if (kind === 'bulk') {
+              const contact = await findContactByExternal(workspaceId, externalContactId, 'whatsapp') as { id?: string } | null
+              isNewContact = !contact?.id || !(await hasInboundMessage(contact.id))
+            }
+            const reservation = await tryReserveSend(conn, kind, isNewContact)
             if (!reservation.ok) return { delivered: false, reason: reservation.reason }
             await sendGatewayText(conn.instanceName, externalContactId, text)
             return DELIVERED

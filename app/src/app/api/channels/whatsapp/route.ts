@@ -8,7 +8,7 @@ import {
   isGatewayConfigured,
   type QrResult,
 } from '@/lib/channels/wa-gateway'
-import { currentDailyCap } from '@/lib/send-limits'
+import { capsForWarmupDay, currentWarmupDay, normalizeSendLimits } from '@/lib/send-limits'
 import { DEFAULT_SEND_LIMITS, type IChannelConnection } from '@/models/ChannelConnection'
 
 /**
@@ -38,23 +38,39 @@ interface StatusPayload {
   limits: typeof DEFAULT_SEND_LIMITS
   cap_today: number | null
   sent_today: number
+  new_contact_cap_today: number | null
+  new_contacts_today: number
+  warmup_day: number
+  ramp_days: number
+  tomorrow_cap: number | null
+  tomorrow_new_contact_cap: number | null
   warmup_started_at: Date | null
 }
 
 function toPayload(
   conn: IChannelConnection | null,
-  qr: string | null = null,
-  pairingCode: string | null = null,
+  qr: string | null = conn?.credentials?.pairingQr ?? null,
+  pairingCode: string | null = conn?.credentials?.pairingCode ?? null,
 ): StatusPayload {
+  const limits = normalizeSendLimits(conn?.limits)
+  const warmupDay = currentWarmupDay(conn?.warmupStartedAt ?? null)
+  const todayCaps = capsForWarmupDay(limits, warmupDay)
+  const tomorrowCaps = capsForWarmupDay(limits, warmupDay + 1)
   return {
     gateway_configured: isGatewayConfigured(),
     status: conn?.status ?? 'disconnected',
     phone_number: conn?.phoneNumber ?? null,
     qr,
     pairing_code: pairingCode,
-    limits: conn?.limits ?? DEFAULT_SEND_LIMITS,
-    cap_today: conn ? currentDailyCap(conn.limits, conn.warmupStartedAt) : null,
+    limits,
+    cap_today: conn ? todayCaps.total : null,
     sent_today: conn?.sentToday ?? 0,
+    new_contact_cap_today: conn ? todayCaps.newContacts : null,
+    new_contacts_today: conn?.newContactsToday ?? 0,
+    warmup_day: warmupDay,
+    ramp_days: limits.rampDays,
+    tomorrow_cap: conn ? tomorrowCaps.total : null,
+    tomorrow_new_contact_cap: conn ? tomorrowCaps.newContacts : null,
     warmup_started_at: conn?.warmupStartedAt ?? null,
   }
 }
@@ -69,9 +85,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
     if (!conn) return NextResponse.json({ data: toPayload(null) })
 
-    // Reconcile our stored status with the gateway's live session state.
-    let qr: string | null = null
-    let pairingCode: string | null = null
+    // Reconcile our stored status with the gateway's live session state. QR
+    // refreshes arrive through QRCODE_UPDATED webhooks; polling this endpoint
+    // must not repeatedly restart the underlying WhatsApp socket.
     try {
       const state = await fetchState(conn.instanceName)
       if (state === 'open' && conn.status !== 'connected') {
@@ -82,16 +98,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         conn.status = 'disconnected'
         await updateChannelConnection(conn.id, { status: conn.status })
       }
-      if (conn.status === 'pending_qr') {
-        const fresh = await fetchQr(conn.instanceName)
-        qr = fresh.qrBase64
-        pairingCode = fresh.pairingCode
-      }
     } catch (error: unknown) {
       console.error('[channels:whatsapp] gateway state check failed:', error)
     }
 
-    return NextResponse.json({ data: toPayload(conn, qr, pairingCode) })
+    return NextResponse.json({ data: toPayload(conn) })
   } catch (error: unknown) {
     console.error('[channels:whatsapp] status failed:', error)
     return NextResponse.json({ error: 'Could not load channel status' }, { status: 500 })
@@ -108,6 +119,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    let phoneNumber: string | undefined
+    if (req.headers.get('content-type')?.includes('application/json')) {
+      const body = (await req.json()) as { phone_number?: unknown }
+      if (body.phone_number !== undefined && body.phone_number !== '') {
+        const digits = String(body.phone_number).replace(/\D/g, '')
+        if (!/^\d{8,15}$/.test(digits)) {
+          return NextResponse.json(
+            { error: 'Enter a valid international WhatsApp number including country code' },
+            { status: 400 },
+          )
+        }
+        phoneNumber = digits
+      }
+    }
+
     const instanceName = instanceNameFor(workspaceId)
 
     let conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
@@ -117,14 +143,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     let qr: QrResult
     try {
-      qr = await createInstance(instanceName)
+      qr = await createInstance(instanceName, phoneNumber)
     } catch (error: unknown) {
       // Instance may already exist from a previous attempt — ask it for a QR.
       console.error('[channels:whatsapp] create failed, trying reconnect:', error)
-      qr = await fetchQr(instanceName)
+      qr = await fetchQr(instanceName, phoneNumber)
     }
 
-    conn = await upsertChannelConnection(workspaceId, 'whatsapp', { instanceName, status: 'pending_qr', limits: conn?.limits ?? DEFAULT_SEND_LIMITS }) as unknown as IChannelConnection
+    conn = await upsertChannelConnection(workspaceId, 'whatsapp', {
+      instanceName,
+      status: 'pending_qr',
+      limits: normalizeSendLimits(conn?.limits),
+      credentials: {
+        ...(conn?.credentials ?? {}),
+        pairingQr: qr.qrBase64,
+        pairingCode: qr.pairingCode,
+        pairingPhoneNumber: phoneNumber ?? null,
+      },
+    }) as unknown as IChannelConnection
 
     return NextResponse.json({ data: toPayload(conn, qr.qrBase64, qr.pairingCode) })
   } catch (error: unknown) {
@@ -139,7 +175,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
 
-  let body: { daily_cap_base?: unknown; daily_cap_max?: unknown; min_delay_seconds?: unknown }
+  let body: {
+    daily_cap_base?: unknown; daily_cap_max?: unknown
+    new_contact_cap_base?: unknown; new_contact_cap_max?: unknown
+    ramp_days?: unknown; min_delay_seconds?: unknown
+  }
   try {
     body = await req.json()
   } catch {
@@ -150,6 +190,9 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   const fields: Array<[keyof typeof body, string, number, number]> = [
     ['daily_cap_base', 'dailyCapBase', 1, 1000],
     ['daily_cap_max', 'dailyCapMax', 1, 5000],
+    ['new_contact_cap_base', 'newContactCapBase', 0, 1000],
+    ['new_contact_cap_max', 'newContactCapMax', 0, 5000],
+    ['ramp_days', 'rampDays', 1, 365],
     ['min_delay_seconds', 'minDelaySeconds', 0, 3600],
   ]
   for (const [key, path, min, max] of fields) {
@@ -167,7 +210,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 
   try {
     const existing = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
-    const conn = existing ? await updateChannelConnection(existing.id, { limits: { ...existing.limits, ...updates } }) as unknown as IChannelConnection : null
+    const conn = existing ? await updateChannelConnection(existing.id, { limits: { ...normalizeSendLimits(existing.limits), ...updates } }) as unknown as IChannelConnection : null
     if (!conn) return NextResponse.json({ error: 'No WhatsApp connection yet' }, { status: 404 })
     return NextResponse.json({ data: toPayload(conn) })
   } catch (error: unknown) {
@@ -192,7 +235,16 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
 
     conn.status = 'disconnected'
     conn.phoneNumber = null
-    await updateChannelConnection(conn.id, { status: 'disconnected', phoneNumber: null })
+    await updateChannelConnection(conn.id, {
+      status: 'disconnected',
+      phoneNumber: null,
+      credentials: {
+        ...(conn.credentials ?? {}),
+        pairingQr: null,
+        pairingCode: null,
+        pairingPhoneNumber: null,
+      },
+    })
     return NextResponse.json({ data: toPayload(conn) })
   } catch (error: unknown) {
     console.error('[channels:whatsapp] disconnect failed:', error)

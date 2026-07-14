@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Sparkles, Play } from 'lucide-react'
-import { CampaignBuilder } from './CampaignBuilder'
+import { CampaignBuilder, type CampaignFormValue } from './CampaignBuilder'
 import { CommentToDmTab } from './CommentToDmTab'
 import { BroadcastTab } from './BroadcastTab'
 
@@ -18,10 +18,26 @@ interface Campaign {
   id: string
   name: string
   status: 'draft' | 'active' | 'paused' | 'completed'
-  trigger_stage: string | null
-  goal?: string
+  campaignType: 'manual' | 'triggered'
+  triggerStage: CampaignFormValue['triggerStage']
+  audience: CampaignFormValue['audience']
+  followUpDelaysDays: number[]
+  goal: string
   flow: unknown[]
-  created_at: string
+  createdAt: string
+}
+
+function normalizeCampaign(value: Record<string, unknown>): Campaign {
+  return {
+    id: String(value.id), name: String(value.name ?? 'Untitled campaign'),
+    status: (value.status as Campaign['status']) ?? 'draft',
+    campaignType: value.campaignType === 'triggered' ? 'triggered' : 'manual',
+    triggerStage: (value.triggerStage as CampaignFormValue['triggerStage']) ?? null,
+    audience: (value.audience as CampaignFormValue['audience']) ?? { stages: [], tags: [], inactiveDays: null, lostOnly: false, contactIds: [], resumeBot: true },
+    followUpDelaysDays: Array.isArray(value.followUpDelaysDays) ? value.followUpDelaysDays as number[] : [],
+    goal: String(value.goal ?? ''), flow: Array.isArray(value.flow) ? value.flow : [],
+    createdAt: String(value.createdAt ?? new Date().toISOString()),
+  }
 }
 
 export function CampaignsView() {
@@ -34,7 +50,7 @@ export function CampaignsView() {
   useEffect(() => {
     fetch('/api/campaigns?workspaceId=ws-1')
       .then((r) => r.json())
-      .then((d) => setCampaigns(d.data ?? []))
+      .then((d) => setCampaigns((d.data ?? []).map((item: Record<string, unknown>) => normalizeCampaign(item))))
       .finally(() => setLoading(false))
   }, [])
 
@@ -43,15 +59,7 @@ export function CampaignsView() {
       <CampaignBuilder
         campaign={editing ?? undefined}
         onSave={(saved) => {
-          const normalized: Campaign = {
-            id: saved.id,
-            name: saved.name,
-            status: editing?.status ?? 'draft',
-            trigger_stage: saved.triggerStage ?? null,
-            goal: saved.goal ?? '',
-            flow: editing?.flow ?? [],
-            created_at: editing?.created_at ?? new Date().toISOString(),
-          }
+          const normalized = { ...normalizeCampaign(saved as unknown as Record<string, unknown>), status: editing?.status ?? 'draft' }
           setCampaigns((prev) =>
             editing
               ? prev.map((c) => (c.id === saved.id ? normalized : c))
@@ -154,7 +162,12 @@ export function CampaignsView() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {campaigns.map((c) => (
-              <CampaignCard key={c.id} campaign={c} onEdit={() => setEditing(c)} />
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                onEdit={() => setEditing(c)}
+                onStatusChange={(status) => setCampaigns((current) => current.map((item) => item.id === c.id ? { ...item, status } : item))}
+              />
             ))}
           </div>
         )}
@@ -163,7 +176,7 @@ export function CampaignsView() {
   )
 }
 
-function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => void }) {
+function CampaignCard({ campaign, onEdit, onStatusChange }: { campaign: Campaign; onEdit: () => void; onStatusChange: (status: Campaign['status']) => void }) {
   const [runState, setRunState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [sentCount, setSentCount] = useState(0)
 
@@ -182,13 +195,24 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
       const res = await fetch(`/api/campaigns/${campaign.id}/run`, { method: 'POST' })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error ?? 'Run failed')
-      setSentCount(body.data.enrolled)
+      setSentCount(body.data.queued)
       setRunState('done')
       setTimeout(() => setRunState('idle'), 4000)
     } catch {
       setRunState('error')
       setTimeout(() => setRunState('idle'), 3000)
     }
+  }
+
+  async function toggleStatus(e: React.MouseEvent) {
+    e.stopPropagation()
+    const status: Campaign['status'] = campaign.status === 'active' ? 'paused' : 'active'
+    const res = await fetch(`/api/campaigns/${campaign.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (res.ok) onStatusChange(status)
   }
 
   const goalPreview = campaign.goal?.trim()
@@ -237,10 +261,10 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
           {goalPreview}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-          {campaign.trigger_stage ? (
-            <>fires on <strong style={{ color: 'var(--text-secondary)' }}>{campaign.trigger_stage.replace('_', ' ')}</strong></>
+          {campaign.campaignType === 'triggered' && campaign.triggerStage ? (
+            <>fires on <strong style={{ color: 'var(--text-secondary)' }}>{campaign.triggerStage.replace('_', ' ')}</strong></>
           ) : (
-            'manual only'
+            <>manual outreach{campaign.followUpDelaysDays.length ? ` · ${campaign.followUpDelaysDays.length} follow-up${campaign.followUpDelaysDays.length === 1 ? '' : 's'}` : ''}</>
           )}
         </div>
       </div>
@@ -265,11 +289,20 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
         }}
       >
         <Play size={12} />
-        {runState === 'running' ? 'Sending…'
-          : runState === 'done' ? `Sent to ${sentCount}`
+        {runState === 'running' ? 'Queueing…'
+          : runState === 'done' ? `Queued ${sentCount}`
           : runState === 'error' ? 'Failed'
           : 'Run now'}
       </button>
+
+      {campaign.campaignType === 'triggered' && campaign.status !== 'completed' && (
+        <button
+          onClick={toggleStatus}
+          style={{ padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer' }}
+        >
+          {campaign.status === 'active' ? 'Pause auto' : 'Activate auto'}
+        </button>
+      )}
 
       <span
         style={{
@@ -282,7 +315,7 @@ function CampaignCard({ campaign, onEdit }: { campaign: Campaign; onEdit: () => 
           marginTop: 2,
         }}
       >
-        {campaign.status}
+        {campaign.campaignType === 'manual' ? 'manual' : campaign.status}
       </span>
     </div>
   )

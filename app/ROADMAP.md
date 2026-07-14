@@ -42,7 +42,7 @@ The minimum where an agency comparing us with DMChamp sees no gaps.
 Both competitors lose customers at onboarding. Win here.
 
 1. **URL → Knowledge Base**: paste the studio's website; we scrape schedule, pricing, services, tone and auto-write the system prompt. Show a diff-style preview the owner can edit in plain language.
-2. **Channel connect flow**: guided WhatsApp (360dialog), Instagram, LINE connection with live status checks — not a settings form.
+2. **Channel connect flow**: WhatsApp linked-device QR is the primary path; Instagram and LINE use guided connections with live status checks. Official WhatsApp Business API remains an optional path for customers who need templates or production-scale outbound.
 3. **Test drive step**: wizard ends inside Test-AI mode chatting with their own agent. "Wow" before they pay.
 4. **Vertical templates**: pick "Yoga studio / Spa / Beauty clinic / Pilates / Muay Thai gym" — pre-tuned prompt, lifecycle labels, campaign pack.
 

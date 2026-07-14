@@ -4,7 +4,7 @@ import { DEFAULT_SYSTEM_PROMPT, hasAiKey, type ChatTurn } from '@/lib/ai'
 import { generateAgentReply } from '@/lib/agent-tools'
 import { deliverMessage } from '@/lib/transport'
 import { guardrailsToPrompt } from '@/lib/guardrails'
-import { createMessage, getAiConfig, getContact, getMessages, updateContact } from '@/lib/queries'
+import { createMessage, getAiConfig, getContact, getMessages, getWorkspace, updateContact } from '@/lib/queries'
 import type { IGuardrails } from '@/models/WorkspaceAiConfig'
 
 type Params = { params: Promise<{ id: string }> }
@@ -54,13 +54,20 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
 
 async function generateReply(contactId: string, contact: ContactRecord, incomingText: string): Promise<string> {
   if (!hasAiKey()) return 'Thanks for your message! The AI provider is not configured yet.'
-  const [config, messages] = await Promise.all([getAiConfig(contact.workspaceId), getMessages(contactId)]) as [
-    { systemPrompt?: string; knowledgeSummary?: string; guardrails?: IGuardrails }, MessageRecord[],
+  const [config, messages, workspace] = await Promise.all([getAiConfig(contact.workspaceId), getMessages(contactId), getWorkspace(contact.workspaceId)]) as [
+    { systemPrompt?: string; knowledgeSummary?: string; guardrails?: IGuardrails }, MessageRecord[], { timezone?: string; currency?: string } | null,
   ]
   const history: ChatTurn[] = messages.slice(0, -1).slice(-10).map((m) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: m.content }))
   const knowledge = config.knowledgeSummary ? `\n\nBUSINESS KNOWLEDGE:\n${config.knowledgeSummary}` : ''
   const memory = contact.memorySummary ? `\nWhat you know about this contact: ${contact.memorySummary}` : ''
   const context = `\n\nContact: ${contact.name ?? 'Unknown'} | Stage: ${contact.lifecycleStage} | Channel: ${contact.channel}${memory}`
   const prompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + guardrailsToPrompt(config.guardrails) + knowledge + context
-  return (await generateAgentReply(prompt, history, incomingText, { workspaceId: contact.workspaceId, contactId, contactName: contact.name ?? 'Customer', channel: contact.channel })).reply
+  return (await generateAgentReply(prompt, history, incomingText, {
+    workspaceId: contact.workspaceId,
+    contactId,
+    contactName: contact.name ?? 'Customer',
+    channel: contact.channel,
+    timezone: workspace?.timezone ?? 'UTC',
+    currency: workspace?.currency ?? 'USD',
+  })).reply
 }
