@@ -1,4 +1,5 @@
 create extension if not exists "pgcrypto";
+create schema if not exists private;
 
 create table if not exists agencies (
   id text primary key default gen_random_uuid()::text,
@@ -147,9 +148,9 @@ create table if not exists server_secrets (
 alter table server_secrets enable row level security;
 revoke all on table server_secrets from anon, authenticated;
 
-create or replace function is_server_request() returns boolean
+create or replace function private.is_server_request() returns boolean
 language sql stable security definer
-set search_path = pg_catalog, public, extensions
+set search_path = pg_catalog, public, private, extensions
 as $$
   select exists (
     select 1
@@ -168,8 +169,9 @@ as $$
   )
 $$;
 
-revoke all on function is_server_request() from public;
-grant execute on function is_server_request() to anon, authenticated, service_role;
+revoke all on function private.is_server_request() from public;
+grant usage on schema private to anon, authenticated, service_role;
+grant execute on function private.is_server_request() to anon, authenticated, service_role;
 
 create index if not exists contacts_workspace_idx on contacts(workspace_id, updated_at desc);
 create index if not exists messages_contact_idx on messages(contact_id, created_at);
@@ -177,8 +179,19 @@ create index if not exists appointments_workspace_idx on appointments(workspace_
 create index if not exists campaigns_workspace_idx on campaigns(workspace_id, status, trigger_stage);
 create index if not exists channel_instance_idx on channel_connections(instance_name);
 create index if not exists ledger_agency_idx on credit_ledger(agency_id, created_at desc);
+create index if not exists users_agency_idx on users(agency_id);
+create index if not exists workspaces_agency_idx on workspaces(agency_id);
+create index if not exists messages_workspace_idx on messages(workspace_id);
+create index if not exists appointments_contact_idx on appointments(contact_id);
+create index if not exists deals_workspace_idx on deals(workspace_id);
+create index if not exists deals_contact_idx on deals(contact_id);
+create index if not exists tasks_workspace_idx on tasks(workspace_id);
+create index if not exists tasks_contact_idx on tasks(contact_id);
+create index if not exists schedule_slots_workspace_idx on schedule_slots(workspace_id);
+create index if not exists campaign_enrollments_contact_idx on campaign_enrollments(contact_id);
+create index if not exists comment_automations_workspace_idx on comment_automations(workspace_id);
 
-create or replace function set_updated_at() returns trigger language plpgsql as $$
+create or replace function set_updated_at() returns trigger language plpgsql set search_path = pg_catalog, public as $$
 begin new.updated_at = now(); return new; end; $$;
 
 do $$ declare t text; begin
@@ -188,26 +201,26 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
-create or replace function spend_credits(agency_id_param text, cost_param integer) returns jsonb language plpgsql security definer as $$
+create or replace function spend_credits(agency_id_param text, cost_param integer) returns jsonb language plpgsql security invoker set search_path = pg_catalog, public, private as $$
 declare new_balance integer;
 begin
-  if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
+  if coalesce(auth.role(), '') <> 'service_role' and not private.is_server_request() then raise exception 'Unauthorized'; end if;
   update agencies set credits = credits - cost_param where id = agency_id_param and credits >= cost_param returning credits into new_balance;
   if new_balance is null then return jsonb_build_object('ok', false, 'balance', coalesce((select credits from agencies where id = agency_id_param), 0)); end if;
   return jsonb_build_object('ok', true, 'balance', new_balance);
 end $$;
 
-create or replace function add_credits(agency_id_param text, amount_param integer) returns integer language plpgsql security definer as $$
+create or replace function add_credits(agency_id_param text, amount_param integer) returns integer language plpgsql security invoker set search_path = pg_catalog, public, private as $$
 declare new_balance integer;
 begin
-if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
+if coalesce(auth.role(), '') <> 'service_role' and not private.is_server_request() then raise exception 'Unauthorized'; end if;
 update agencies set credits = credits + amount_param where id = agency_id_param returning credits into new_balance;
 if new_balance is null then raise exception 'Agency not found'; end if; return new_balance; end $$;
 
-create or replace function increment_slot_booking(slot_id text, expected_booked integer) returns jsonb language plpgsql security definer as $$
+create or replace function increment_slot_booking(slot_id text, expected_booked integer) returns jsonb language plpgsql security invoker set search_path = pg_catalog, public, private as $$
 declare updated schedule_slots;
 begin
-  if coalesce(auth.role(), '') <> 'service_role' and not is_server_request() then raise exception 'Unauthorized'; end if;
+  if coalesce(auth.role(), '') <> 'service_role' and not private.is_server_request() then raise exception 'Unauthorized'; end if;
   update schedule_slots set booked = booked + 1 where id = slot_id and booked = expected_booked and booked < capacity returning * into updated;
   if updated.id is null then return null; end if; return to_jsonb(updated);
 end $$;
@@ -239,11 +252,13 @@ begin
   ] loop
     execute format('drop policy if exists server_access on %I', t);
     execute format(
-      'create policy server_access on %I for all to anon, authenticated using (is_server_request()) with check (is_server_request())',
+      'create policy server_access on %I for all to anon, authenticated using (private.is_server_request()) with check (private.is_server_request())',
       t
     );
   end loop;
 end $$;
+
+drop function if exists public.is_server_request();
 
 -- Server routes use either the service role or a publishable key plus the private server header.
 -- Never expose AUTH_SECRET or SUPABASE_SERVICE_ROLE_KEY to the browser.
