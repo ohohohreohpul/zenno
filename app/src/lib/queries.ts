@@ -87,6 +87,13 @@ export async function createWorkspace(data: Record<string, unknown>) {
   return fromDb(row)
 }
 
+export async function updateWorkspace(id: string, patch: Record<string, unknown>) {
+  if (IS_MOCK) return { id, ...patch }
+  const { data, error } = await ensureSupa().from('workspaces').update(toDb(patch)).eq('id', id).select().maybeSingle()
+  if (error) throw error
+  return fromDb(data)
+}
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 export async function getUserByEmail(email: string) {
@@ -472,10 +479,18 @@ export async function getChannelConnectionByInstance(instanceName: string) {
   return fromDb(data)
 }
 
-export async function getChannelConnectionByPageId(pageId: string) {
+export async function getChannelConnectionByPageId(pageId: string, channel = 'messenger') {
   if (IS_MOCK) return null
   const { data, error } = await ensureSupa().from('channel_connections').select('*')
-    .eq('channel', 'messenger').eq('status', 'connected').eq('credentials->>pageId', pageId).maybeSingle()
+    .eq('channel', channel).eq('status', 'connected').eq('credentials->>pageId', pageId).maybeSingle()
+  if (error) throw error
+  return fromDb(data)
+}
+
+export async function getChannelConnectionByVerifyToken(verifyToken: string, channel: string) {
+  if (IS_MOCK) return null
+  const { data, error } = await ensureSupa().from('channel_connections').select('*')
+    .eq('channel', channel).eq('status', 'connected').eq('credentials->>verifyToken', verifyToken).maybeSingle()
   if (error) throw error
   return fromDb(data)
 }

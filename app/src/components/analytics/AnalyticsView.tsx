@@ -31,11 +31,13 @@ interface AnalyticsData {
 
 export function AnalyticsView() {
   const [data, setData] = useState<AnalyticsData | null>(null)
+  const [workspaceName, setWorkspaceName] = useState('Zenno')
 
   useEffect(() => {
     fetch('/api/analytics?workspaceId=ws-1')
       .then((r) => r.json())
       .then(setData)
+    fetch('/api/agency').then((r) => r.json()).then((body) => setWorkspaceName(body.data?.name ?? 'Zenno')).catch(() => {})
   }, [])
 
   if (!data) {
@@ -56,7 +58,7 @@ export function AnalyticsView() {
       {/* Header */}
       <div style={{ height: 'var(--topbar-height)', display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid var(--border)', background: 'var(--card)', flexShrink: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>Analytics</span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-tertiary)' }}>Lotus Yoga Bangkok · Last 7 days</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-tertiary)' }}>{workspaceName} · Last 7 days</span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>

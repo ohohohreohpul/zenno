@@ -88,6 +88,16 @@ export function WebchatCard() {
             <span>Widget is live — paste this into any website:</span>
           </div>
           <CopyRow label="Embed snippet" value={state.snippet} />
+          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg)', padding: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 10 }}>WEBSITE PREVIEW</div>
+            <div style={{ width: 280, maxWidth: '100%', marginLeft: 'auto', borderRadius: 12, overflow: 'hidden', background: 'white', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+              <div style={{ background: 'var(--accent)', color: 'white', padding: '11px 13px', fontSize: 13, fontWeight: 600 }}>Chat with us<div style={{ fontSize: 10, opacity: .7, fontWeight: 400, marginTop: 2 }}>Typically replies in seconds</div></div>
+              <div style={{ minHeight: 90, padding: 12, background: '#fafafa' }}>
+                <div style={{ display: 'inline-block', background: 'white', border: '1px solid #e4e4e7', borderRadius: '10px 10px 10px 4px', padding: '8px 10px', fontSize: 12 }}>Hi! How can I help you today?</div>
+              </div>
+              <div style={{ borderTop: '1px solid #e4e4e7', padding: '10px 12px', color: '#a1a1aa', fontSize: 12 }}>Type a message… <span style={{ float: 'right', color: 'var(--accent)', fontWeight: 600 }}>Send</span></div>
+            </div>
+          </div>
           <div>
             <button
               onClick={() => {

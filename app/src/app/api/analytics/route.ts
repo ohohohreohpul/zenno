@@ -19,12 +19,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     Promise.all(contacts.map((c) => getMessages(c.id))), getAppointments(workspaceId),
   ]) as [MessageRow[][], Array<{ createdAt: string | Date }>]
   const messages = messageGroups.flat()
+  const inboundMessages = messages.filter((m) => m.direction === 'inbound').length
+  const outboundMessages = messages.filter((m) => m.direction === 'outbound').length
   const weekAgo = Date.now() - WEEK_MS
   const stages = ['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip']
   const channels = ['whatsapp','instagram','line','webchat']
   return NextResponse.json({
     contacts_total: contacts.length,
     messages_total: messages.length,
+    inbound_messages: inboundMessages,
+    outbound_messages: outboundMessages,
+    reply_rate: inboundMessages > 0 ? Math.min(100, Math.round((outboundMessages / inboundMessages) * 100)) : 0,
     ai_messages: messages.filter((m) => m.aiGenerated).length,
     bookings_week: appointments.filter((a) => new Date(a.createdAt).getTime() >= weekAgo).length,
     stage_counts: Object.fromEntries(stages.map((s) => [s, contacts.filter((c) => c.lifecycleStage === s).length])),

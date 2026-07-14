@@ -1,27 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, ExternalLink } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './GuardrailsSection'
 import { WhatsAppConnectCard } from './WhatsAppConnectCard'
 import { CredentialChannelCard, type ChannelCardConfig } from './CredentialChannelCard'
 import { WebchatCard } from './WebchatCard'
 import { OptimizeCard } from './OptimizeCard'
-
-const CHANNELS = [
-  {
-    id: 'instagram',
-    name: 'Instagram DM',
-    description: 'Meta Cloud API · requires Business account',
-    color: 'var(--channel-instagram)',
-    fields: [
-      { key: 'page_access_token', label: 'Page Access Token', placeholder: 'EAAxxxx', type: 'password' },
-      { key: 'page_id', label: 'Page ID', placeholder: '123456789', type: 'text' },
-    ],
-    docsUrl: 'https://developers.facebook.com/docs/messenger-platform/',
-    connected: false,
-  },
-]
 
 const TELEGRAM_CONFIG: ChannelCardConfig = {
   id: 'telegram',
@@ -63,12 +48,28 @@ const MESSENGER_CONFIG: ChannelCardConfig = {
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',
 }
 
+const INSTAGRAM_CONFIG: ChannelCardConfig = {
+  id: 'instagram',
+  name: 'Instagram DM',
+  color: 'var(--channel-instagram)',
+  description: 'Connect an Instagram Professional account through your Meta app',
+  endpoint: '/api/channels/instagram',
+  fields: [
+    { key: 'page_access_token', label: 'Page access token', placeholder: 'EAAxxxx', type: 'password' },
+    { key: 'app_secret', label: 'Meta app secret', placeholder: '••••••••', type: 'password' },
+  ],
+  helpText: 'After connecting, add the webhook URL and verify token shown here to the Instagram webhook in Meta Developers.',
+  docsUrl: 'https://developers.facebook.com/docs/messenger-platform/instagram/',
+}
+
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<'channels' | 'ai' | 'workspace'>('ai')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [guardrails, setGuardrails] = useState<Guardrails>(DEFAULT_GUARDRAILS)
+  const [workspace, setWorkspace] = useState({ name: '', slug: '' })
+  const [workspaceSaved, setWorkspaceSaved] = useState(false)
 
   useEffect(() => {
     fetch('/api/ai-config?workspaceId=ws-1')
@@ -77,6 +78,10 @@ export function SettingsView() {
         if (d.data?.systemPrompt) setSystemPrompt(d.data.systemPrompt)
         if (d.data?.guardrails) setGuardrails(d.data.guardrails)
       })
+      .catch(() => {})
+    fetch('/api/workspaces/ws-1')
+      .then((r) => r.json())
+      .then((body) => setWorkspace({ name: body.data?.name ?? '', slug: body.data?.slug ?? '' }))
       .catch(() => {})
   }, [])
 
@@ -94,6 +99,18 @@ export function SettingsView() {
     } catch {
       setSaveError('Could not save the prompt. Please try again.')
     }
+  }
+
+  async function handleSaveWorkspace() {
+    setSaveError(null)
+    const res = await fetch('/api/workspaces/ws-1', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(workspace),
+    })
+    const body = await res.json()
+    if (!res.ok) { setSaveError(typeof body.error === 'string' ? body.error : 'Could not save workspace'); return }
+    setWorkspace({ name: body.data.name, slug: body.data.slug })
+    setWorkspaceSaved(true)
+    setTimeout(() => setWorkspaceSaved(false), 2000)
   }
 
   return (
@@ -203,19 +220,19 @@ export function SettingsView() {
             <CredentialChannelCard config={TELEGRAM_CONFIG} />
             <CredentialChannelCard config={LINE_CONFIG} />
             <CredentialChannelCard config={MESSENGER_CONFIG} />
-            {CHANNELS.map((ch) => (
-              <ChannelCard key={ch.id} channel={ch} />
-            ))}
+            <CredentialChannelCard config={INSTAGRAM_CONFIG} />
           </div>
         )}
 
         {activeTab === 'workspace' && (
           <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Field label="Workspace name" defaultValue="Lotus Yoga Bangkok" />
-            <Field label="Slug" defaultValue="lotus-yoga" hint="Used in webhook URLs" />
-            <Field label="Custom domain" defaultValue="" placeholder="chat.lotusmyoga.com (optional)" />
+            <WorkspaceField label="Workspace name" value={workspace.name} onChange={(name) => setWorkspace((current) => ({ ...current, name }))} />
+            <WorkspaceField label="Slug" value={workspace.slug} onChange={(slug) => setWorkspace((current) => ({ ...current, slug }))} hint="Used in webhook URLs" />
+            {saveError && <div style={{ fontSize: 12, color: 'var(--stage-vip)' }}>{saveError}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <SaveButton />
+              <button onClick={handleSaveWorkspace} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: 'none', borderRadius: 'var(--radius-sm)', background: workspaceSaved ? 'var(--stage-attended)' : 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                {workspaceSaved ? <><Check size={13} /> Saved</> : 'Save changes'}
+              </button>
             </div>
           </div>
         )}
@@ -224,93 +241,16 @@ export function SettingsView() {
   )
 }
 
-function ChannelCard({ channel }: { channel: typeof CHANNELS[0] }) {
-  const [open, setOpen] = useState(channel.connected)
-  const [values, setValues] = useState<Record<string, string>>({})
-
-  return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', cursor: 'pointer' }}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: channel.color, flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{channel.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{channel.description}</div>
-        </div>
-        {channel.connected ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--stage-attended)', fontWeight: 500 }}>
-            <Check size={12} /> Connected
-          </span>
-        ) : (
-          <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Not connected</span>
-        )}
-        <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginLeft: 4 }}>{open ? '▲' : '▼'}</span>
-      </div>
-
-      {open && (
-        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--border)' }}>
-          <div style={{ paddingTop: 16 }} />
-          {channel.fields.map((f) => (
-            <div key={f.key}>
-              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>{f.label}</label>
-              <input
-                type={f.type}
-                placeholder={f.placeholder}
-                value={values[f.key] ?? ''}
-                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '9px 12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg)',
-                  fontSize: 13,
-                  color: 'var(--text-primary)',
-                  fontFamily: 'var(--font-mono)',
-                  outline: 'none',
-                }}
-              />
-            </div>
-          ))}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-            <a href={channel.docsUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-tertiary)', textDecoration: 'none' }}>
-              <ExternalLink size={11} /> View docs
-            </a>
-            <button style={{ padding: '8px 16px', border: 'none', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-              Save
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Field({ label, defaultValue, placeholder, hint }: { label: string; defaultValue: string; placeholder?: string; hint?: string }) {
+function WorkspaceField({ label, value, onChange, hint }: { label: string; value: string; onChange: (value: string) => void; hint?: string }) {
   return (
     <div>
       <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>{label}</label>
       <input
-        defaultValue={defaultValue}
-        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--card)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
       />
       {hint && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{hint}</div>}
     </div>
-  )
-}
-
-function SaveButton() {
-  const [saved, setSaved] = useState(false)
-  return (
-    <button
-      onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000) }}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: 'none', borderRadius: 'var(--radius-sm)', background: saved ? 'var(--stage-attended)' : 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background var(--duration-fast)' }}
-    >
-      {saved ? <><Check size={13} /> Saved</> : 'Save changes'}
-    </button>
   )
 }

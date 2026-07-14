@@ -120,8 +120,15 @@ export async function deliverMessage(
       }
 
       case 'instagram': {
-        if (!isChannelConfigured('instagram')) return NOT_CONNECTED('instagram')
-        await sendInstagram(externalContactId, text)
+        const conn = await findConnection(workspaceId, 'instagram')
+        const pageToken = conn?.credentials?.pageAccessToken
+        if (pageToken) {
+          await sendInstagram(pageToken, externalContactId, text)
+          return DELIVERED
+        }
+        const envToken = process.env.META_PAGE_ACCESS_TOKEN
+        if (!envToken) return NOT_CONNECTED('instagram')
+        await sendInstagram(envToken, externalContactId, text)
         return DELIVERED
       }
 

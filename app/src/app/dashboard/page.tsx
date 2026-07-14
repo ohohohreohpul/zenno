@@ -48,6 +48,7 @@ interface AnalyticsData {
   contacts_total: number
   messages_total: number
   ai_messages: number
+  reply_rate: number
   bookings_week?: number
   stage_counts: Record<string, number>
   channel_counts: Record<string, number>
@@ -56,6 +57,11 @@ interface AnalyticsData {
 
 interface AgencyData {
   name?: string
+}
+
+interface ConversationData {
+  contact: { id: string; name: string | null; lifecycle_stage: string; channel: string }
+  last_message: { content: string } | null
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
@@ -167,28 +173,21 @@ function LifecycleFunnel({ stageCounts }: { stageCounts: Record<string, number> 
   )
 }
 
-// ── Top Contacts Mock ─────────────────────────────────────────────────────────
-
-const MOCK_CONTACTS = [
-  { name: 'Ananya Sharma', stage: 'qualified', preview: 'Yes I am interested in the morning yoga class', channel: 'whatsapp' },
-  { name: 'Tom Fischer', stage: 'trial_booked', preview: 'See you Saturday at 9am!', channel: 'instagram' },
-  { name: 'Priya Nair', stage: 'attended', preview: 'The session was amazing, thank you', channel: 'line' },
-  { name: 'Leo Dupont', stage: 'vip', preview: 'Can I bring a friend next time?', channel: 'whatsapp' },
-  { name: 'Suki Watanabe', stage: 'reviewed', preview: 'I left a 5 star review on Google', channel: 'webchat' },
-]
-
-function TopContacts() {
+function TopContacts({ conversations }: { conversations: ConversationData[] }) {
+  if (conversations.length === 0) {
+    return <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No customer conversations yet</div>
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {MOCK_CONTACTS.map((c, i) => (
+      {conversations.slice(0, 5).map(({ contact, last_message }, i) => (
         <div
-          key={i}
+          key={contact.id}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 12,
             padding: '10px 0',
-            borderBottom: i < MOCK_CONTACTS.length - 1 ? '1px solid var(--border)' : 'none',
+            borderBottom: i < Math.min(conversations.length, 5) - 1 ? '1px solid var(--border)' : 'none',
           }}
         >
           <div
@@ -206,11 +205,11 @@ function TopContacts() {
               flexShrink: 0,
             }}
           >
-            {c.name[0]}
+            {(contact.name ?? 'Customer')[0]}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{c.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{contact.name ?? 'Customer'}</div>
             <div
               style={{
                 fontSize: 11.5,
@@ -220,7 +219,7 @@ function TopContacts() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {c.preview}
+              {last_message?.content ?? 'No messages yet'}
             </div>
           </div>
 
@@ -229,24 +228,24 @@ function TopContacts() {
               style={{
                 fontSize: 10.5,
                 fontWeight: 500,
-                color: STAGE_COLORS[c.stage],
-                background: `${STAGE_COLORS[c.stage]}18`,
+                color: STAGE_COLORS[contact.lifecycle_stage] ?? STAGE_COLORS.inquiry,
+                background: `${STAGE_COLORS[contact.lifecycle_stage] ?? STAGE_COLORS.inquiry}18`,
                 padding: '2px 7px',
                 borderRadius: 99,
               }}
             >
-              {STAGE_LABELS[c.stage]}
+              {STAGE_LABELS[contact.lifecycle_stage] ?? 'Inquiry'}
             </span>
             <span
               style={{
                 fontSize: 10,
                 color: '#fff',
-                background: CHANNEL_COLORS[c.channel],
+                background: CHANNEL_COLORS[contact.channel] ?? CHANNEL_COLORS.webchat,
                 padding: '1px 6px',
                 borderRadius: 99,
               }}
             >
-              {CHANNEL_LABELS[c.channel]}
+              {CHANNEL_LABELS[contact.channel] ?? contact.channel}
             </span>
           </div>
         </div>
@@ -320,16 +319,19 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [agency, setAgency] = useState<AgencyData | null>(null)
+  const [conversations, setConversations] = useState<ConversationData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       fetch('/api/analytics?workspaceId=ws-1').then((r) => r.json()),
       fetch('/api/agency').then((r) => r.json()),
+      fetch('/api/conversations?workspaceId=ws-1').then((r) => r.json()),
     ])
-      .then(([analyticsRes, agencyRes]) => {
+      .then(([analyticsRes, agencyRes, conversationRes]) => {
         setAnalytics(analyticsRes)
         setAgency(agencyRes.data ?? {})
+        setConversations(conversationRes.data ?? [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -348,7 +350,7 @@ export default function DashboardPage() {
   const aiPct = analytics.messages_total > 0
     ? Math.round((analytics.ai_messages / analytics.messages_total) * 100)
     : 0
-  const workspaceName = agency?.name ?? 'Lotus Yoga Bangkok'
+  const workspaceName = agency?.name ?? 'Zenno'
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -395,7 +397,7 @@ export default function DashboardPage() {
           <KpiCard icon={MessageSquare} label="Conversations" value={analytics.contacts_total.toLocaleString()} />
           <KpiCard icon={Send} label="Messages Sent" value={analytics.messages_total.toLocaleString()} />
           <KpiCard icon={Bot} label="AI Replies" value={analytics.ai_messages.toLocaleString()} sub={`${aiPct}% of total`} />
-          <KpiCard icon={Reply} label="Replied" value="89%" sub="reply rate" />
+          <KpiCard icon={Reply} label="Replied" value={`${analytics.reply_rate ?? 0}%`} sub="reply rate" />
         </div>
 
         {/* Row 2: Chart + Funnel */}
@@ -429,7 +431,7 @@ export default function DashboardPage() {
         {/* Row 3: Contacts + Channels */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Panel title="Top Contacts">
-            <TopContacts />
+            <TopContacts conversations={conversations} />
           </Panel>
 
           <Panel title="Channel Breakdown">

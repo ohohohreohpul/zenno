@@ -1,6 +1,6 @@
 export type GatewayStatus = 'disconnected' | 'pending_qr' | 'connected'
 
-export type ConnectableChannel = 'whatsapp' | 'telegram' | 'line' | 'messenger' | 'webchat'
+export type ConnectableChannel = 'whatsapp' | 'telegram' | 'line' | 'messenger' | 'instagram' | 'webchat'
 
 /** Per-channel credentials a workspace stores when connecting its own account. */
 export interface IChannelCredentials {
@@ -16,6 +16,10 @@ export interface IChannelCredentials {
   pageAccessToken?: string
   /** Messenger page id — routes inbound webhook events to the workspace. */
   pageId?: string
+  /** Meta app secret used to verify inbound Instagram webhook signatures. */
+  appSecret?: string
+  /** Per-workspace Meta webhook verification token. */
+  verifyToken?: string
   /** Public embed key for the web chat widget. */
   embedKey?: string
   /** Secret we generate and hand to the platform (e.g. Telegram secret_token). */
