@@ -1,96 +1,193 @@
--- Enable UUID generation
 create extension if not exists "pgcrypto";
 
--- ─── Workspaces ───────────────────────────────────────────────────────────────
+create table if not exists agencies (
+  id text primary key default gen_random_uuid()::text,
+  name text not null, slug text not null unique, owner_id text not null,
+  logo_url text, custom_domain text unique, brand_color text not null default '#000000',
+  credits integer not null default 0 check (credits >= 0),
+  plan text not null default 'trial' check (plan in ('trial','starter','pro','enterprise')),
+  stripe_customer_id text unique, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists users (
+  id text primary key default gen_random_uuid()::text,
+  email text not null unique, password_hash text not null, name text not null,
+  role text not null default 'staff' check (role in ('owner','admin','staff')),
+  agency_id text references agencies(id) on delete set null,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
 create table if not exists workspaces (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  slug        text not null unique,
-  logo_url    text,
-  created_at  timestamptz not null default now()
+  id text primary key default gen_random_uuid()::text,
+  name text not null, slug text not null unique, logo_url text,
+  agency_id text references agencies(id) on delete cascade,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
--- ─── Workspace AI Configuration ───────────────────────────────────────────────
-create table if not exists workspace_ai_configs (
-  id                 uuid primary key default gen_random_uuid(),
-  workspace_id       uuid not null references workspaces(id) on delete cascade,
-  system_prompt      text,
-  knowledge_summary  text,
-  created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now(),
-  unique(workspace_id)
-);
-
--- ─── Contacts ─────────────────────────────────────────────────────────────────
 create table if not exists contacts (
-  id                 uuid primary key default gen_random_uuid(),
-  workspace_id       uuid not null references workspaces(id) on delete cascade,
-  external_id        text not null,
-  channel            text not null check (channel in ('whatsapp','instagram','line','webchat','sms','email')),
-  name               text,
-  phone              text,
-  instagram_handle   text,
-  lifecycle_stage    text not null default 'inquiry'
-                       check (lifecycle_stage in ('inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip')),
-  created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now(),
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  external_id text not null, channel text not null,
+  name text, phone text, instagram_handle text,
+  lifecycle_stage text not null default 'inquiry' check (lifecycle_stage in ('inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip')),
+  tags text[] not null default '{}', bot_active boolean not null default true, dnd boolean not null default false,
+  chat_status text not null default 'open' check (chat_status in ('open','closed')),
+  attention_required boolean not null default false, unread integer not null default 0,
+  notes text not null default '', memory_summary text not null default '', memory_updated_at timestamptz,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   unique(workspace_id, external_id, channel)
 );
 
-create index if not exists contacts_workspace_id_idx on contacts(workspace_id);
-create index if not exists contacts_lifecycle_idx on contacts(workspace_id, lifecycle_stage);
-
--- ─── Messages ─────────────────────────────────────────────────────────────────
 create table if not exists messages (
-  id            uuid primary key default gen_random_uuid(),
-  workspace_id  uuid not null references workspaces(id) on delete cascade,
-  contact_id    uuid not null references contacts(id) on delete cascade,
-  channel       text not null,
-  direction     text not null check (direction in ('inbound','outbound')),
-  content       text not null,
-  ai_generated  boolean not null default false,
-  created_at    timestamptz not null default now()
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  contact_id text not null references contacts(id) on delete cascade,
+  channel text not null, direction text not null check (direction in ('inbound','outbound')),
+  content text not null, ai_generated boolean not null default false, created_at timestamptz not null default now()
 );
 
-create index if not exists messages_contact_id_idx on messages(contact_id);
-create index if not exists messages_workspace_created_idx on messages(workspace_id, created_at desc);
+create table if not exists appointments (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  contact_id text references contacts(id) on delete set null, contact_name text not null, class_name text not null,
+  starts_at timestamptz not null, duration_min integer not null default 60, channel text not null,
+  kind text not null default 'regular' check (kind in ('trial','regular','consult')), created_at timestamptz not null default now()
+);
 
--- ─── Campaigns ────────────────────────────────────────────────────────────────
+create table if not exists deals (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  contact_id text references contacts(id) on delete set null, contact_name text not null, name text not null,
+  value numeric not null default 0, currency text not null default 'THB',
+  stage text not null default 'lead' check (stage in ('lead','qualified','proposal','negotiation','won','lost')),
+  channel text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists tasks (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  contact_id text references contacts(id) on delete set null, title text not null, contact_name text,
+  priority text not null default 'medium' check (priority in ('high','medium','low')),
+  status text not null default 'todo' check (status in ('todo','in_progress','waiting','done')),
+  due_date timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists schedule_slots (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  class_name text not null, day_of_week integer not null check (day_of_week between 0 and 6), time text not null,
+  duration_min integer not null default 60, capacity integer not null check (capacity > 0),
+  booked integer not null default 0 check (booked >= 0 and booked <= capacity), instructor text not null default '',
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
 create table if not exists campaigns (
-  id            uuid primary key default gen_random_uuid(),
-  workspace_id  uuid not null references workspaces(id) on delete cascade,
-  name          text not null,
-  status        text not null default 'draft' check (status in ('draft','active','paused','completed')),
-  trigger_stage text check (trigger_stage in ('inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip')),
-  flow          jsonb not null default '[]',
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null, status text not null default 'draft' check (status in ('draft','active','paused','completed')),
+  trigger_stage text, goal text not null default '', flow jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
-create index if not exists campaigns_workspace_id_idx on campaigns(workspace_id);
-
--- ─── Campaign Enrollments ─────────────────────────────────────────────────────
 create table if not exists campaign_enrollments (
-  id           uuid primary key default gen_random_uuid(),
-  campaign_id  uuid not null references campaigns(id) on delete cascade,
-  contact_id   uuid not null references contacts(id) on delete cascade,
-  step_index   int not null default 0,
-  status       text not null default 'active' check (status in ('active','completed','exited')),
-  enrolled_at  timestamptz not null default now(),
-  updated_at   timestamptz not null default now(),
-  next_run_at  timestamptz,
-  unique(campaign_id, contact_id)
+  id text primary key default gen_random_uuid()::text,
+  campaign_id text not null references campaigns(id) on delete cascade,
+  contact_id text not null references contacts(id) on delete cascade,
+  step_index integer not null default 0, status text not null default 'active' check (status in ('active','completed','exited')),
+  enrolled_at timestamptz not null default now(), next_run_at timestamptz,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(campaign_id, contact_id)
 );
 
-create index if not exists enrollments_next_run_idx on campaign_enrollments(next_run_at) where status = 'active';
+create table if not exists channel_connections (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  channel text not null, credentials jsonb not null default '{}'::jsonb, instance_name text not null,
+  status text not null default 'disconnected' check (status in ('disconnected','pending_qr','connected')),
+  phone_number text, warmup_started_at timestamptz,
+  limits jsonb not null default '{"dailyCapBase":20,"dailyCapMax":200,"minDelaySeconds":15}'::jsonb,
+  sent_date text, sent_today integer not null default 0, last_sent_at timestamptz,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(workspace_id, channel)
+);
 
--- ─── Row Level Security ────────────────────────────────────────────────────────
+create table if not exists comment_automations (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  keyword text not null, post_label text not null, opening_dm text not null,
+  status text not null default 'active' check (status in ('active','paused')),
+  stats jsonb not null default '{"commentsCaptured":0,"dmsSent":0,"booked":0}'::jsonb,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists workspace_ai_configs (
+  id text primary key default gen_random_uuid()::text,
+  workspace_id text not null references workspaces(id) on delete cascade unique,
+  system_prompt text, knowledge_summary text,
+  guardrails jsonb not null default '{"alwaysEscalateTopics":[],"maxDiscountPercent":null,"businessHoursOnly":false}'::jsonb,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists credit_ledger (
+  id text primary key default gen_random_uuid()::text,
+  agency_id text not null references agencies(id) on delete cascade,
+  delta integer not null, reason text not null, ref_id text, balance integer not null, created_at timestamptz not null default now()
+);
+
+create table if not exists stripe_events (
+  id text primary key, type text not null, processed boolean not null default false, created_at timestamptz not null default now()
+);
+
+create index if not exists contacts_workspace_idx on contacts(workspace_id, updated_at desc);
+create index if not exists messages_contact_idx on messages(contact_id, created_at);
+create index if not exists appointments_workspace_idx on appointments(workspace_id, starts_at);
+create index if not exists campaigns_workspace_idx on campaigns(workspace_id, status, trigger_stage);
+create index if not exists channel_instance_idx on channel_connections(instance_name);
+create index if not exists ledger_agency_idx on credit_ledger(agency_id, created_at desc);
+
+create or replace function set_updated_at() returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end; $$;
+
+do $$ declare t text; begin
+  foreach t in array array['agencies','users','workspaces','contacts','deals','tasks','schedule_slots','campaigns','campaign_enrollments','channel_connections','comment_automations','workspace_ai_configs'] loop
+    execute format('drop trigger if exists set_updated_at on %I', t);
+    execute format('create trigger set_updated_at before update on %I for each row execute function set_updated_at()', t);
+  end loop;
+end $$;
+
+create or replace function spend_credits(agency_id_param text, cost_param integer) returns jsonb language plpgsql security definer as $$
+declare new_balance integer;
+begin
+  update agencies set credits = credits - cost_param where id = agency_id_param and credits >= cost_param returning credits into new_balance;
+  if new_balance is null then return jsonb_build_object('ok', false, 'balance', coalesce((select credits from agencies where id = agency_id_param), 0)); end if;
+  return jsonb_build_object('ok', true, 'balance', new_balance);
+end $$;
+
+create or replace function add_credits(agency_id_param text, amount_param integer) returns integer language plpgsql security definer as $$
+declare new_balance integer;
+begin update agencies set credits = credits + amount_param where id = agency_id_param returning credits into new_balance;
+if new_balance is null then raise exception 'Agency not found'; end if; return new_balance; end $$;
+
+create or replace function increment_slot_booking(slot_id text, expected_booked integer) returns jsonb language plpgsql security definer as $$
+declare updated schedule_slots;
+begin
+  update schedule_slots set booked = booked + 1 where id = slot_id and booked = expected_booked and booked < capacity returning * into updated;
+  if updated.id is null then return null; end if; return to_jsonb(updated);
+end $$;
+
+alter table agencies enable row level security;
+alter table users enable row level security;
 alter table workspaces enable row level security;
-alter table workspace_ai_configs enable row level security;
 alter table contacts enable row level security;
 alter table messages enable row level security;
+alter table appointments enable row level security;
+alter table deals enable row level security;
+alter table tasks enable row level security;
+alter table schedule_slots enable row level security;
 alter table campaigns enable row level security;
 alter table campaign_enrollments enable row level security;
+alter table channel_connections enable row level security;
+alter table comment_automations enable row level security;
+alter table workspace_ai_configs enable row level security;
+alter table credit_ledger enable row level security;
+alter table stripe_events enable row level security;
 
--- Service role bypasses RLS — all app queries use service role key.
--- Add per-user policies here when adding auth.
+-- Server routes use the service-role key, which bypasses RLS. Never expose it to the browser.

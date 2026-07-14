@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Zap, CreditCard, TrendingUp, Check } from 'lucide-react'
+import { Zap } from 'lucide-react'
 
 const PACKS = [
   { id: '500', credits: 500, price: '$9', pricePerMsg: '$0.018', popular: false },

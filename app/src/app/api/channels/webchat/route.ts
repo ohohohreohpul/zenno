@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import {
   appBaseUrl,
   connectionInstanceName,
   randomSecret,
   workspaceIdFrom,
 } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Web chat channel: enabling it mints a public embed key and the script
@@ -33,11 +32,7 @@ function payload(status: 'connected' | 'disconnected', embedKey: string | null) 
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({
-      workspaceId: workspaceIdFrom(req),
-      channel: 'webchat',
-    }).lean()
+    const conn = await getChannelConnection(workspaceIdFrom(req), 'webchat') as { id: string; status: string; credentials?: { embedKey?: string } } | null
     if (!conn || conn.status !== 'connected') {
       return NextResponse.json(payload('disconnected', null))
     }
@@ -59,24 +54,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await connectDb()
-    const existing = await ChannelConnection.findOne({ workspaceId, channel: 'webchat' })
+    const existing = await getChannelConnection(workspaceId, 'webchat') as { credentials?: { embedKey?: string } } | null
     const embedKey =
       !rotate && existing?.credentials?.embedKey
         ? existing.credentials.embedKey
         : `wc_${randomSecret(16)}`
 
-    const conn = await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'webchat' },
-      {
-        $set: {
+    const conn = await upsertChannelConnection(workspaceId, 'webchat', {
           status: 'connected',
           instanceName: connectionInstanceName('webchat', workspaceId),
-          'credentials.embedKey': embedKey,
-        },
-      },
-      { upsert: true, new: true },
-    )
+          credentials: { embedKey },
+    }) as { credentials?: { embedKey?: string } }
     return NextResponse.json(payload('connected', conn.credentials?.embedKey ?? embedKey))
   } catch (error: unknown) {
     console.error('[channels:webchat] enable failed:', error)
@@ -86,11 +74,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
   try {
-    await connectDb()
-    await ChannelConnection.updateOne(
-      { workspaceId: workspaceIdFrom(req), channel: 'webchat' },
-      { $set: { status: 'disconnected' } },
-    )
+    const conn = await getChannelConnection(workspaceIdFrom(req), 'webchat') as { id: string } | null
+    if (conn) await updateChannelConnection(conn.id, { status: 'disconnected' })
     return NextResponse.json(payload('disconnected', null))
   } catch (error: unknown) {
     console.error('[channels:webchat] disable failed:', error)

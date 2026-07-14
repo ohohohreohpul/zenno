@@ -50,7 +50,8 @@ export function WhatsAppConnectCard() {
   }, [])
 
   useEffect(() => {
-    refresh()
+    const timer = setTimeout(() => { void refresh() }, 0)
+    return () => clearTimeout(timer)
   }, [refresh])
 
   // Poll while a QR pairing is pending so the card flips to connected by itself.

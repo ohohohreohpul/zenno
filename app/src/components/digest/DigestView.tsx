@@ -418,7 +418,8 @@ export function DigestView() {
   }, [dayOffset])
 
   useEffect(() => {
-    loadDigest()
+    const timer = setTimeout(() => { void loadDigest() }, 0)
+    return () => clearTimeout(timer)
   }, [loadDigest])
 
   return (

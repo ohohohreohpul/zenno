@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyLineSignature, verifyLineSignatureWith } from '@/lib/channels/line'
 import { handleIncoming } from '@/lib/conversation'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection } from '@/lib/queries'
 import { workspaceIdFrom } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 import type { IncomingMessage } from '@/types'
 
 /**
@@ -20,8 +19,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let verified = false
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'line' }).lean()
+    const conn = await getChannelConnection(workspaceId, 'line') as { credentials?: { channelSecret?: string } } | null
     const secret = conn?.credentials?.channelSecret
     if (secret) verified = verifyLineSignatureWith(secret, rawBody, signature)
   } catch (error: unknown) {

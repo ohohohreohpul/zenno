@@ -1,5 +1,5 @@
 import { IS_MOCK } from './mock-store'
-import { connectDb } from './db'
+import { getChannelConnection } from './queries'
 import { sendWhatsApp } from './channels/whatsapp'
 import { sendInstagram } from './channels/instagram'
 import { sendLine, sendLinePush } from './channels/line'
@@ -7,7 +7,7 @@ import { sendTelegram } from './channels/telegram'
 import { sendMessenger } from './channels/messenger'
 import { isGatewayConfigured, sendGatewayText } from './channels/wa-gateway'
 import { tryReserveSend, type SendKind } from './send-limits'
-import { ChannelConnection, type IChannelConnection } from '@/models/ChannelConnection'
+import type { IChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Unified outbound delivery. Each channel prefers the workspace's own
@@ -45,8 +45,9 @@ async function findConnection(
   channel: string,
 ): Promise<IChannelConnection | null> {
   try {
-    await connectDb()
-    return await ChannelConnection.findOne({ workspaceId, channel, status: 'connected' })
+    const connection = await getChannelConnection(workspaceId, channel)
+    if (!connection || connection.status !== 'connected') return null
+    return connection as unknown as IChannelConnection
   } catch (error: unknown) {
     console.error(`[transport] ${channel} connection lookup failed:`, error)
     return null

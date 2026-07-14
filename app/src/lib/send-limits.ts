@@ -1,4 +1,5 @@
-import { ChannelConnection, type IChannelConnection, type ISendLimits } from '@/models/ChannelConnection'
+import type { IChannelConnection, ISendLimits } from '@/models/ChannelConnection'
+import { reserveChannelSend } from './queries'
 
 /**
  * Warm-up quotas for gateway-connected numbers. Fresh numbers get a small
@@ -21,7 +22,7 @@ export function currentDailyCap(limits: ISendLimits, warmupStartedAt: Date | nul
   const base = Math.max(1, limits.dailyCapBase)
   const max = Math.max(base, limits.dailyCapMax)
   if (!warmupStartedAt) return base
-  const weeks = Math.floor((Date.now() - warmupStartedAt.getTime()) / MS_PER_WEEK)
+  const weeks = Math.floor((Date.now() - new Date(warmupStartedAt).getTime()) / MS_PER_WEEK)
   const ramped = base * 2 ** Math.max(0, weeks)
   return Math.min(ramped, max)
 }
@@ -42,14 +43,8 @@ export async function tryReserveSend(
   const today = utcToday()
   const cap = currentDailyCap(conn.limits, conn.warmupStartedAt)
 
-  // Roll the counter over on a new UTC day.
-  await ChannelConnection.updateOne(
-    { _id: conn._id, sentDate: { $ne: today } },
-    { $set: { sentDate: today, sentToday: 0 } },
-  )
-
   if (kind === 'bulk' && conn.limits.minDelaySeconds > 0 && conn.lastSentAt) {
-    const elapsedSec = (Date.now() - conn.lastSentAt.getTime()) / 1000
+    const elapsedSec = (Date.now() - new Date(conn.lastSentAt).getTime()) / 1000
     if (elapsedSec < conn.limits.minDelaySeconds) {
       return {
         ok: false,
@@ -59,11 +54,7 @@ export async function tryReserveSend(
   }
 
   // Conditional increment: only succeeds while under today's cap.
-  const updated = await ChannelConnection.findOneAndUpdate(
-    { _id: conn._id, sentDate: today, sentToday: { $lt: cap } },
-    { $inc: { sentToday: 1 }, $set: { lastSentAt: new Date() } },
-    { new: true },
-  ).lean()
+  const updated = await reserveChannelSend(conn.id, today, cap)
 
   if (!updated) {
     return {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { connectDb } from '@/lib/db'
-import { Agency } from '@/models/Agency'
+import { createAgency } from '@/lib/queries'
 
 const createSchema = z.object({
   name: z.string().min(1).max(80),
@@ -11,8 +10,6 @@ const createSchema = z.object({
 })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  await connectDb()
-
   let body: unknown
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -24,14 +21,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { name, slug, ownerId, brandColor } = parsed.data
 
   try {
-    const agency = await Agency.create({
+    const agency = await createAgency({
       name, slug, ownerId,
       brandColor: brandColor ?? '#000000',
       credits: 50,
     })
     return NextResponse.json({ data: agency }, { status: 201 })
   } catch (err: unknown) {
-    const isDuplicate = (err as any)?.code === 11000
+    const isDuplicate = (err as { code?: string })?.code === '23505'
     return NextResponse.json(
       { error: isDuplicate ? 'Slug already taken' : 'Failed to create agency' },
       { status: isDuplicate ? 409 : 500 },

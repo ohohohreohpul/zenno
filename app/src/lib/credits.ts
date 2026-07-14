@@ -1,7 +1,4 @@
-import mongoose from 'mongoose'
-import { connectDb } from './db'
-import { Agency } from '@/models/Agency'
-import { CreditLedger } from '@/models/CreditLedger'
+import { addCredits as addCreditsQuery, getAgencyBalance, spendCredits } from './queries'
 
 export const CREDIT_COST: Record<string, number> = {
   ai_reply:      1,
@@ -15,41 +12,9 @@ export async function spendCredit(
   reason: CreditReason,
   refId?: string,
 ): Promise<{ ok: boolean; balance: number }> {
-  await connectDb()
-
   const cost = CREDIT_COST[reason] ?? 0
   if (cost === 0) return { ok: true, balance: 0 }
-
-  const session = await mongoose.startSession()
-  session.startTransaction()
-
-  try {
-    const agency = await Agency.findById(agencyId).session(session)
-    if (!agency || agency.credits < cost) {
-      await session.abortTransaction()
-      return { ok: false, balance: agency?.credits ?? 0 }
-    }
-
-    const newBalance = agency.credits - cost
-    agency.credits = newBalance
-    await agency.save({ session })
-
-    await CreditLedger.create([{
-      agencyId,
-      delta: -cost,
-      reason,
-      refId: refId ?? null,
-      balance: newBalance,
-    }], { session })
-
-    await session.commitTransaction()
-    return { ok: true, balance: newBalance }
-  } catch (err) {
-    await session.abortTransaction()
-    throw err
-  } finally {
-    session.endSession()
-  }
+  return spendCredits(agencyId, cost, reason, refId)
 }
 
 export async function addCredits(
@@ -58,40 +23,9 @@ export async function addCredits(
   reason: CreditReason,
   refId?: string,
 ): Promise<number> {
-  await connectDb()
-
-  const session = await mongoose.startSession()
-  session.startTransaction()
-
-  try {
-    const agency = await Agency.findById(agencyId).session(session)
-    if (!agency) throw new Error(`Agency not found: ${agencyId}`)
-
-    const newBalance = agency.credits + amount
-    agency.credits = newBalance
-    await agency.save({ session })
-
-    await CreditLedger.create([{
-      agencyId,
-      delta: amount,
-      reason,
-      refId: refId ?? null,
-      balance: newBalance,
-    }], { session })
-
-    await session.commitTransaction()
-    return newBalance
-  } catch (err) {
-    await session.abortTransaction()
-    throw err
-  } finally {
-    session.endSession()
-  }
+  return addCreditsQuery(agencyId, amount, reason, refId)
 }
 
 export async function getBalance(agencyId: string): Promise<number> {
-  await connectDb()
-  const agency = await Agency.findById(agencyId).select('credits').lean()
-  if (!agency) throw new Error(`Agency not found: ${agencyId}`)
-  return agency.credits
+  return getAgencyBalance(agencyId)
 }

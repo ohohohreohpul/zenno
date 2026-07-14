@@ -31,14 +31,13 @@ export function verifyWhatsAppSignature(
   const secret = process.env.WHATSAPP_WEBHOOK_SECRET
   if (!secret) return false
 
-  const crypto = require('crypto') as typeof import('crypto')
-  const expected = crypto
-    .createHmac('sha256', secret)
+  const expected = createHmac('sha256', secret)
     .update(rawBody)
     .digest('hex')
 
-  return crypto.timingSafeEqual(
+  return timingSafeEqual(
     Buffer.from(signature.replace('sha256=', ''), 'hex'),
     Buffer.from(expected, 'hex'),
   )
 }
+import { createHmac, timingSafeEqual } from 'crypto'

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import { validatePageToken } from '@/lib/channels/messenger'
 import {
   appBaseUrl,
   connectionInstanceName,
   workspaceIdFrom,
 } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 import { MESSENGER_VERIFY_TOKEN } from '@/lib/channels/messenger-verify'
 
 /**
@@ -30,8 +29,7 @@ function payload(workspaceId: string, status: 'connected' | 'disconnected', page
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'messenger' }).lean()
+    const conn = await getChannelConnection(workspaceId, 'messenger') as { id: string; status: string; credentials?: { botUsername?: string } } | null
     if (!conn || conn.status !== 'connected') {
       return NextResponse.json(payload(workspaceId, 'disconnected'))
     }
@@ -59,20 +57,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const { pageId, pageName } = await validatePageToken(token)
 
-    await connectDb()
-    await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'messenger' },
-      {
-        $set: {
+    await upsertChannelConnection(workspaceId, 'messenger', {
           status: 'connected',
           instanceName: connectionInstanceName('messenger', workspaceId),
-          'credentials.pageAccessToken': token,
-          'credentials.pageId': pageId,
-          'credentials.botUsername': pageName,
-        },
-      },
-      { upsert: true, new: true },
-    )
+          credentials: { pageAccessToken: token, pageId, botUsername: pageName },
+    })
     return NextResponse.json(payload(workspaceId, 'connected', pageName))
   } catch (error: unknown) {
     console.error('[channels:messenger] connect failed:', error)
@@ -84,17 +73,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    await ChannelConnection.updateOne(
-      { workspaceId, channel: 'messenger' },
-      {
-        $set: {
-          status: 'disconnected',
-          'credentials.pageAccessToken': null,
-          'credentials.pageId': null,
-        },
-      },
-    )
+    const conn = await getChannelConnection(workspaceId, 'messenger') as { id: string } | null
+    if (conn) await updateChannelConnection(conn.id, { status: 'disconnected', credentials: { pageAccessToken: null, pageId: null } })
     return NextResponse.json(payload(workspaceId, 'disconnected'))
   } catch (error: unknown) {
     console.error('[channels:messenger] disconnect failed:', error)

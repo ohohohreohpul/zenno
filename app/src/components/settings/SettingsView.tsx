@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, AlertCircle, ExternalLink } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './GuardrailsSection'
 import { WhatsAppConnectCard } from './WhatsAppConnectCard'
 import { CredentialChannelCard, type ChannelCardConfig } from './CredentialChannelCard'

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { Contact } from '@/models/Contact'
-import { serializeDoc } from '@/lib/serialize'
+import { getContact, updateContact } from '@/lib/queries'
 import { triggerCampaignsForStage } from '@/lib/campaign-runner'
 
 type Params = { params: Promise<{ id: string }> }
@@ -29,24 +26,13 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  if (IS_MOCK) {
-    const previous = MockDB.getContact(id)
-    const updated = MockDB.updateContact(id, parsed.data)
-    if (!updated) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
-    await fireStageCampaigns(previous?.lifecycleStage, updated.lifecycleStage, {
-      workspaceId: updated.workspaceId, id: updated._id, name: updated.name, channel: updated.channel,
-    })
-    return NextResponse.json({ data: updated })
-  }
-
-  await connectDb()
-  const previous = await Contact.findById(id).lean()
-  const updated = await Contact.findByIdAndUpdate(id, { $set: parsed.data }, { new: true }).lean()
+  const previous = await getContact(id) as unknown as { lifecycleStage?: string } | null
+  const updated = await updateContact(id, parsed.data) as unknown as { id: string; workspaceId: string; lifecycleStage: string; name: string | null; channel: string } | null
   if (!updated) return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   await fireStageCampaigns(previous?.lifecycleStage, updated.lifecycleStage, {
-    workspaceId: updated.workspaceId, id: updated._id.toString(), name: updated.name, channel: updated.channel,
+    workspaceId: updated.workspaceId, id: updated.id, name: updated.name, channel: updated.channel,
   })
-  return NextResponse.json({ data: serializeDoc(updated) })
+  return NextResponse.json({ data: updated })
 }
 
 interface StageChangeContact {

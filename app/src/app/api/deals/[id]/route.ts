@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { Deal } from '@/models/Deal'
-import { serializeDoc } from '@/lib/serialize'
+import { deleteDeal, getDeal, updateDeal } from '@/lib/queries'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -25,29 +22,15 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  if (IS_MOCK) {
-    const updated = MockDB.updateDeal(id, parsed.data)
-    if (!updated) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
-    return NextResponse.json({ data: updated })
-  }
-
-  await connectDb()
-  const updated = await Deal.findByIdAndUpdate(id, { $set: parsed.data }, { new: true }).lean()
+  const updated = await updateDeal(id, parsed.data)
   if (!updated) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
-  return NextResponse.json({ data: serializeDoc(updated) })
+  return NextResponse.json({ data: updated })
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
 
-  if (IS_MOCK) {
-    const removed = MockDB.deleteDeal(id)
-    if (!removed) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
-    return NextResponse.json({ data: { id } })
-  }
-
-  await connectDb()
-  const deleted = await Deal.findByIdAndDelete(id).lean()
-  if (!deleted) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
+  if (!await getDeal(id)) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
+  await deleteDeal(id)
   return NextResponse.json({ data: { id } })
 }

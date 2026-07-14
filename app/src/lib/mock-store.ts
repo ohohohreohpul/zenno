@@ -1,5 +1,4 @@
-import type { Types } from 'mongoose'
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const IS_MOCK = process.env.MOCK_MODE === 'true'
 
 type ID = string
@@ -130,7 +129,6 @@ interface MockWorkspace {
   createdAt: Date
 }
 
-const now = new Date()
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000)
 
 export const mockAgencies: MockAgency[] = [
@@ -281,6 +279,7 @@ export const mockCampaigns: MockCampaign[] = [
 ]
 
 // Runtime mutable state (survives within a single server process)
+let _agencies = [...mockAgencies]
 let _contacts = [...mockContacts]
 let _messages = [...mockMessages]
 let _campaigns = [...mockCampaigns]
@@ -289,6 +288,7 @@ let _tasks = [...mockTasks]
 let _schedule = [...mockSchedule]
 let _appointments = [...mockAppointments]
 let _commentAutomations = [...mockCommentAutomations]
+let _channelConnections: Array<Record<string, any> & { id: string; workspaceId: string; channel: string }> = []
 
 let _nextId = 1000
 function uid() { return `mock-${++_nextId}` }
@@ -297,6 +297,19 @@ export const MockDB = {
   // Contacts
   getContacts: (workspaceId: string) => _contacts.filter(c => c.workspaceId === workspaceId),
   getContact: (id: string) => _contacts.find(c => c._id === id) ?? null,
+  createContact: (data: Pick<MockContact, 'workspaceId' | 'externalId' | 'channel'> & Partial<MockContact>) => {
+    const now = new Date()
+    const contact: MockContact = {
+      _id: uid(), workspaceId: data.workspaceId, externalId: data.externalId, channel: data.channel,
+      name: data.name ?? null, phone: data.phone ?? null, lifecycleStage: data.lifecycleStage ?? 'inquiry',
+      tags: data.tags ?? [], botActive: data.botActive ?? true, dnd: data.dnd ?? false,
+      chatStatus: data.chatStatus ?? 'open', attentionRequired: data.attentionRequired ?? false,
+      unread: data.unread ?? 0, notes: data.notes ?? '', memorySummary: data.memorySummary ?? '',
+      memoryUpdatedAt: data.memoryUpdatedAt ?? null, createdAt: now, updatedAt: now,
+    }
+    _contacts = [..._contacts, contact]
+    return contact
+  },
   updateContact: (id: string, patch: Partial<Omit<MockContact, '_id' | 'workspaceId' | 'createdAt'>>) => {
     const existing = _contacts.find(c => c._id === id)
     if (!existing) return null
@@ -330,6 +343,7 @@ export const MockDB = {
 
   // Tasks
   getTasks: (workspaceId: string) => _tasks.filter(t => t.workspaceId === workspaceId),
+  getTask: (id: string) => _tasks.find(t => t._id === id) ?? null,
   createTask: (data: Omit<MockTask, '_id' | 'createdAt' | 'updatedAt'>) => {
     const task: MockTask = { ...data, _id: uid(), createdAt: new Date(), updatedAt: new Date() }
     _tasks = [..._tasks, task]
@@ -350,6 +364,7 @@ export const MockDB = {
 
   // Messages
   getMessages: (contactId: string) => _messages.filter(m => m.contactId === contactId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+  getAllMessages: () => [..._messages],
   getLastMessage: (contactId: string) => {
     const msgs = _messages.filter(m => m.contactId === contactId)
     return msgs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
@@ -378,10 +393,23 @@ export const MockDB = {
   },
 
   // Agencies
-  getAgency: (id: string) => mockAgencies.find(a => a._id === id) ?? null,
+  getAgency: (id: string) => _agencies.find(a => a._id === id) ?? null,
+  updateAgency: (id: string, patch: Partial<Omit<MockAgency, '_id' | 'createdAt'>>) => {
+    const existing = _agencies.find(a => a._id === id)
+    if (!existing) return null
+    const updated = { ...existing, ...patch, updatedAt: new Date() }
+    _agencies = _agencies.map(a => (a._id === id ? updated : a))
+    return updated
+  },
+  createAgency: (data: Omit<MockAgency, '_id' | 'createdAt' | 'updatedAt'>) => {
+    const a = { ...data, _id: `agency-${Date.now()}`, createdAt: new Date(), updatedAt: new Date() }
+    _agencies = [..._agencies, a]
+    return a
+  },
 
   // Workspaces
   getWorkspaces: (agencyId: string) => mockWorkspaces.filter(w => w.agencyId === agencyId),
+  getWorkspace: (id: string) => mockWorkspaces.find(w => w._id === id) ?? null,
 
   // Schedule
   getSchedule: (workspaceId: string) => _schedule.filter(s => s.workspaceId === workspaceId),
@@ -421,6 +449,23 @@ export const MockDB = {
     _commentAutomations = _commentAutomations.map(a => (a._id === id ? updated : a))
     return updated
   },
+
+  // Channel connections
+  getChannelConnection: (workspaceId: string, channel: string) => _channelConnections.find(c => c.workspaceId === workspaceId && c.channel === channel) ?? null,
+  getChannelConnectionByInstance: (instanceName: string) => _channelConnections.find(c => c.instanceName === instanceName) ?? null,
+  createChannelConnection: (data: Record<string, any>) => {
+    const row = { id: uid(), credentials: {}, status: 'disconnected', ...data, workspaceId: String(data.workspaceId), channel: String(data.channel) }
+    _channelConnections = [..._channelConnections, row]
+    return row
+  },
+  updateChannelConnection: (id: string, patch: Record<string, any>) => {
+    const existing = _channelConnections.find(c => c.id === id)
+    if (!existing) return null
+    const updated = { ...existing, ...patch }
+    _channelConnections = _channelConnections.map(c => c.id === id ? updated : c)
+    return updated
+  },
+  findChannelConnectionByEmbedKey: (key: string) => _channelConnections.find(c => c.credentials?.embedKey === key) ?? null,
 
   // AI config
   getSystemPrompt: (workspaceId: string) => _systemPrompts[workspaceId] ?? DEFAULT_MOCK_SYSTEM_PROMPT,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import {
   registerTelegramWebhook,
   removeTelegramWebhook,
@@ -11,7 +11,6 @@ import {
   randomSecret,
   workspaceIdFrom,
 } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Telegram channel connection.
@@ -31,11 +30,7 @@ function payload(status: 'connected' | 'disconnected', botUsername: string | nul
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({
-      workspaceId: workspaceIdFrom(req),
-      channel: 'telegram',
-    }).lean()
+    const conn = await getChannelConnection(workspaceIdFrom(req), 'telegram') as { id: string; status: string; credentials?: { botUsername?: string } } | null
     if (!conn || conn.status !== 'connected') return NextResponse.json(payload('disconnected'))
     return NextResponse.json(payload('connected', conn.credentials?.botUsername ?? null))
   } catch (error: unknown) {
@@ -78,20 +73,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       webhookSecret,
     )
 
-    await connectDb()
-    const conn = await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'telegram' },
-      {
-        $set: {
+    const conn = await upsertChannelConnection(workspaceId, 'telegram', {
           status: 'connected',
           instanceName: connectionInstanceName('telegram', workspaceId),
-          'credentials.botToken': botToken,
-          'credentials.botUsername': botUsername,
-          'credentials.webhookSecret': webhookSecret,
-        },
-      },
-      { upsert: true, new: true },
-    )
+          credentials: { botToken, botUsername, webhookSecret },
+    }) as { credentials?: { botUsername?: string } }
     return NextResponse.json(payload('connected', conn.credentials?.botUsername ?? botUsername))
   } catch (error: unknown) {
     console.error('[channels:telegram] connect failed:', error)
@@ -103,8 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'telegram' })
+    const conn = await getChannelConnection(workspaceId, 'telegram') as { id: string; credentials?: { botToken?: string } } | null
     if (!conn) return NextResponse.json(payload('disconnected'))
 
     const botToken = conn.credentials?.botToken
@@ -116,16 +101,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    await ChannelConnection.updateOne(
-      { _id: conn._id },
-      {
-        $set: {
-          status: 'disconnected',
-          'credentials.botToken': null,
-          'credentials.webhookSecret': null,
-        },
-      },
-    )
+    await updateChannelConnection(conn.id, { status: 'disconnected', credentials: { botToken: null, webhookSecret: null } })
     return NextResponse.json(payload('disconnected'))
   } catch (error: unknown) {
     console.error('[channels:telegram] disconnect failed:', error)

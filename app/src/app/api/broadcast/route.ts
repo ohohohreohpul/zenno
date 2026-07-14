@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
 import { generateReplyCore, hasAiKey } from '@/lib/ai'
-import { connectDb } from '@/lib/db'
-import { Contact } from '@/models/Contact'
-import { Message } from '@/models/Message'
+import { createMessage, getContact, getContacts } from '@/lib/queries'
 import { deliverMessage } from '@/lib/transport'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
@@ -55,14 +52,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { workspaceId, stages, tags, instruction, mode } = parsed.data
 
-  const recipients = IS_MOCK
-    ? MockDB.getContacts(workspaceId)
-        .filter((c) => !c.dnd)
-        .filter((c) => stages.length === 0 || stages.includes(c.lifecycleStage))
-        .filter((c) => tags.length === 0 || c.tags.some((t) => tags.includes(t)))
-        .slice(0, MAX_RECIPIENTS)
-        .map((c) => ({ _id: c._id, name: c.name, channel: c.channel, lifecycleStage: c.lifecycleStage, tags: c.tags }))
-    : await findDbRecipients(workspaceId, stages, tags)
+  const recipients = await findRecipients(workspaceId, stages, tags)
 
   if (recipients.length === 0) {
     return NextResponse.json({ data: { targets: [], sent: 0 } })
@@ -83,8 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   for (const t of targets) {
-    if (IS_MOCK) {
-      MockDB.addMessage({
+      await createMessage({
         workspaceId,
         contactId: t.contactId,
         channel: t.channel,
@@ -92,18 +81,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         content: t.message,
         aiGenerated: true,
       })
-    } else {
-      await Message.create({
-        workspaceId,
-        contactId: t.contactId,
-        channel: t.channel,
-        direction: 'outbound',
-        content: t.message,
-        aiGenerated: true,
-      })
-      const contact = await Contact.findById(t.contactId).select('externalId').lean()
-      if (contact) await deliverMessage(workspaceId, t.channel, contact.externalId, t.message, { kind: 'bulk' })
-    }
+      const contact = await getContact(t.contactId) as { externalId?: string } | null
+      if (contact?.externalId) await deliverMessage(workspaceId, t.channel, contact.externalId, t.message, { kind: 'bulk' })
   }
 
   return NextResponse.json({ data: { targets, sent: targets.length } })
@@ -117,19 +96,17 @@ interface BroadcastRecipient {
   tags: string[]
 }
 
-async function findDbRecipients(
+async function findRecipients(
   workspaceId: string,
   stages: string[],
   tags: string[],
 ): Promise<BroadcastRecipient[]> {
-  await connectDb()
-  const query: Record<string, unknown> = { workspaceId, dnd: false }
-  if (stages.length > 0) query.lifecycleStage = { $in: stages }
-  if (tags.length > 0) query.tags = { $in: tags }
-
-  const contacts = await Contact.find(query).limit(MAX_RECIPIENTS).lean()
-  return contacts.map((c) => ({
-    _id: c._id.toString(),
+  const contacts = await getContacts(workspaceId) as unknown as Array<{ id: string; name: string | null; channel: string; lifecycleStage: string; tags?: string[]; dnd?: boolean }>
+  return contacts.filter((c) => !c.dnd)
+    .filter((c) => stages.length === 0 || stages.includes(c.lifecycleStage))
+    .filter((c) => tags.length === 0 || (c.tags ?? []).some((t) => tags.includes(t)))
+    .slice(0, MAX_RECIPIENTS).map((c) => ({
+    _id: c.id,
     name: c.name,
     channel: c.channel,
     lifecycleStage: c.lifecycleStage,

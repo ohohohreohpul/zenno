@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection } from '@/lib/queries'
 import { handleIncoming } from '@/lib/conversation'
 import { workspaceIdFrom } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Telegram bot webhook. Registered per workspace as
@@ -30,8 +29,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'telegram' }).lean()
+    const conn = await getChannelConnection(workspaceId, 'telegram') as { status: string; credentials?: { webhookSecret?: string } } | null
     if (!conn || conn.status !== 'connected') {
       return NextResponse.json({ status: 'no connection' })
     }

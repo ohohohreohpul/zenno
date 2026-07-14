@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { Campaign } from '@/models/Campaign'
+import { createCampaign, getCampaigns } from '@/lib/queries'
 
 const lifecycleEnum = z.enum(['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'])
 
@@ -32,16 +30,8 @@ const createSchema = z.object({
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? 'ws-1'
 
-  if (IS_MOCK) {
-    const data = MockDB.getCampaigns(workspaceId).map((c) => ({ ...c, id: c._id }))
-    return NextResponse.json({ data })
-  }
-
-  await connectDb()
   if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
-
-  const campaigns = await Campaign.find({ workspaceId }).sort({ createdAt: -1 }).lean()
-  return NextResponse.json({ data: campaigns.map((c) => ({ ...c, id: c._id.toString() })) })
+  return NextResponse.json({ data: await getCampaigns(workspaceId) })
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -56,12 +46,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const goalText = goal ?? ''
   const flowArr = flow ?? []
 
-  if (IS_MOCK) {
-    const c = MockDB.createCampaign({ workspaceId, name, triggerStage: triggerStage ?? 'inquiry', goal: goalText, flow: flowArr, status: 'draft' })
-    return NextResponse.json({ data: { ...c, id: c._id } }, { status: 201 })
-  }
-
-  await connectDb()
-  const campaign = await Campaign.create({ workspaceId, name, triggerStage: triggerStage ?? null, goal: goalText, flow: flowArr, status: 'draft' })
-  return NextResponse.json({ data: { ...campaign.toObject(), id: campaign._id.toString() } }, { status: 201 })
+  const campaign = await createCampaign({ workspaceId, name, triggerStage: triggerStage ?? null, goal: goalText, flow: flowArr, status: 'draft' })
+  return NextResponse.json({ data: campaign }, { status: 201 })
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TrendingUp, MessageSquare, Users, Bot } from 'lucide-react'
+import { MessageSquare, Users, Bot } from 'lucide-react'
 
 const STAGES = ['inquiry','qualified','trial_booked','attended','reviewed','rebooked','vip'] as const
 const STAGE_LABELS: Record<string, string> = {
@@ -73,8 +73,6 @@ export function AnalyticsView() {
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 16 }}>Message Volume</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100 }}>
             {data.volume_by_day.map((d) => {
-              const total = d.inbound + d.outbound
-              const pct = (total / maxDay) * 100
               return (
                 <div key={d.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: 80, gap: 1 }}>

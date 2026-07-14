@@ -1,5 +1,4 @@
-import { connectDb } from './db'
-import { WorkspaceAiConfig } from '@/models/WorkspaceAiConfig'
+import { getAiConfig } from './queries'
 import type { IContact } from '@/models/Contact'
 import type { IMessage } from '@/models/Message'
 
@@ -51,9 +50,7 @@ export async function generateReply(
   incomingText: string,
   workspaceId: string,
 ): Promise<string> {
-  await connectDb()
-
-  const config = await WorkspaceAiConfig.findOne({ workspaceId }).lean()
+  const config = await getAiConfig(workspaceId) as { systemPrompt?: string; knowledgeSummary?: string }
 
   const systemPrompt = config?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT
   const knowledgeContext = config?.knowledgeSummary

@@ -1,9 +1,4 @@
-import { IS_MOCK, MockDB } from './mock-store'
-import { connectDb } from './db'
-import { Contact } from '@/models/Contact'
-import { Message } from '@/models/Message'
-import { Appointment } from '@/models/Appointment'
-import { WorkspaceAiConfig } from '@/models/WorkspaceAiConfig'
+import { getAiConfig, getAppointments, getContacts, getMessages } from './queries'
 import { generateReplyCore, hasAiKey } from './ai'
 
 /**
@@ -143,43 +138,26 @@ async function loadSamples(
 ): Promise<{ samples: ConversationSample[]; currentPrompt: string }> {
   const stallCutoff = new Date(Date.now() - STALL_HOURS * 60 * 60 * 1000)
 
-  if (IS_MOCK) {
-    const contacts = MockDB.getContacts(workspaceId)
-    const samples: ConversationSample[] = []
-    for (const c of contacts) {
-      const msgs = MockDB.getMessages(c._id)
-      if (msgs.length < 2) continue
-      const transcript = msgs.map((m) => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.content}`).join('\n').slice(0, MAX_TRANSCRIPT_CHARS)
-      const last = msgs[msgs.length - 1]
-      const isWon = ['trial_booked', 'attended', 'rebooked', 'vip'].includes(c.lifecycleStage)
-      const isLost = !isWon && last.direction === 'outbound' && last.createdAt.getTime() < stallCutoff.getTime()
-      if (isWon) samples.push({ contactName: c.name ?? 'Unknown', stage: c.lifecycleStage, outcome: 'won', transcript })
-      else if (isLost) samples.push({ contactName: c.name ?? 'Unknown', stage: c.lifecycleStage, outcome: 'lost', transcript })
-    }
-    return { samples, currentPrompt: MockDB.getSystemPrompt(workspaceId) }
-  }
-
-  await connectDb()
-  const [contacts, config] = await Promise.all([
-    Contact.find({ workspaceId }).lean(),
-    WorkspaceAiConfig.findOne({ workspaceId }).lean(),
-  ])
-  const currentPrompt = config?.systemPrompt ?? ''
-
-  const bookedContactIds = new Set(
-    (await Appointment.find({ workspaceId }).distinct('contactId').lean()).map(String),
-  )
+  const [contacts, config, appointments] = await Promise.all([
+    getContacts(workspaceId), getAiConfig(workspaceId), getAppointments(workspaceId),
+  ]) as unknown as [
+    Array<{ id: string; name?: string; lifecycleStage: string }>,
+    { systemPrompt?: string },
+    Array<{ contactId?: string }>,
+  ]
+  const currentPrompt = config.systemPrompt ?? ''
+  const bookedContactIds = new Set(appointments.map((a) => a.contactId).filter(Boolean))
 
   const samples: ConversationSample[] = []
   for (const c of contacts) {
-    const msgs = await Message.find({ contactId: c._id }).sort({ createdAt: 1 }).limit(40).lean()
+    const msgs = (await getMessages(c.id) as unknown as Array<{ direction: string; content: string; createdAt: string | Date }>).slice(0, 40)
     if (msgs.length < 2) continue
     const transcript = msgs
       .map((m) => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.content}`)
       .join('\n')
       .slice(0, MAX_TRANSCRIPT_CHARS)
     const last = msgs[msgs.length - 1]
-    const isWon = bookedContactIds.has(String(c._id)) || ['trial_booked', 'attended', 'rebooked', 'vip'].includes(c.lifecycleStage)
+    const isWon = bookedContactIds.has(c.id) || ['trial_booked', 'attended', 'rebooked', 'vip'].includes(c.lifecycleStage)
     const isLost = !isWon && last.direction === 'outbound' && new Date(last.createdAt).getTime() < stallCutoff.getTime()
     if (isWon) samples.push({ contactName: c.name ?? 'Unknown', stage: c.lifecycleStage, outcome: 'won', transcript })
     else if (isLost) samples.push({ contactName: c.name ?? 'Unknown', stage: c.lifecycleStage, outcome: 'lost', transcript })

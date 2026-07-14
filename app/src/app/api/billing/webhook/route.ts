@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { addCredits } from '@/lib/credits'
-import { connectDb } from '@/lib/db'
-import { StripeEvent } from '@/models/StripeEvent'
+import { createStripeEvent, getStripeEvent, markStripeEventProcessed } from '@/lib/queries'
 import type Stripe from 'stripe'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -16,19 +15,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  await connectDb()
-
   // Idempotency
-  const existing = await StripeEvent.findById(event.id).lean()
+  const existing = await getStripeEvent(event.id) as { processed?: boolean } | null
   if (existing?.processed) return NextResponse.json({ status: 'already_processed' })
 
-  await StripeEvent.findByIdAndUpdate(event.id, { type: event.type }, { upsert: true })
+  if (!existing) await createStripeEvent({ id: event.id, type: event.type, processed: false })
 
   if (event.type === 'checkout.session.completed') {
     await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session)
   }
 
-  await StripeEvent.findByIdAndUpdate(event.id, { processed: true })
+  await markStripeEventProcessed(event.id)
   return NextResponse.json({ status: 'ok' })
 }
 

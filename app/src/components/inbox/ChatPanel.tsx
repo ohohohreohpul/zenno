@@ -26,10 +26,10 @@ export function ChatPanel({ contactId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setData(null)
-    fetch(`/api/contacts/${contactId}/messages`)
+    const timer = setTimeout(() => { void fetch(`/api/contacts/${contactId}/messages`)
       .then((r) => r.json())
-      .then(setData)
+      .then(setData) }, 0)
+    return () => clearTimeout(timer)
   }, [contactId])
 
   useEffect(() => {

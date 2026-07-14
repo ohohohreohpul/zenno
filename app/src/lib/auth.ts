@@ -27,7 +27,9 @@ interface SessionClaims extends SessionPayload {
 }
 
 function getAuthSecret(): string {
-  return process.env.AUTH_SECRET || DEV_FALLBACK_SECRET
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET
+  if (process.env.NODE_ENV === 'production') throw new Error('AUTH_SECRET is required in production')
+  return DEV_FALLBACK_SECRET
 }
 
 function scryptAsync(password: string, salt: Buffer): Promise<Buffer> {

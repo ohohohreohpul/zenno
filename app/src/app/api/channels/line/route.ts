@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import { validateLineToken } from '@/lib/channels/line'
 import {
   appBaseUrl,
   connectionInstanceName,
   workspaceIdFrom,
 } from '@/lib/channels/connection-helpers'
-import { ChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * LINE channel connection. The business pastes their Messaging API channel
@@ -32,8 +31,7 @@ function payload(
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'line' }).lean()
+    const conn = await getChannelConnection(workspaceId, 'line') as { id: string; status: string; credentials?: { botUsername?: string } } | null
     if (!conn || conn.status !== 'connected') {
       return NextResponse.json(payload(workspaceId, 'disconnected'))
     }
@@ -66,20 +64,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const botName = await validateLineToken(accessToken)
 
-    await connectDb()
-    await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'line' },
-      {
-        $set: {
+    await upsertChannelConnection(workspaceId, 'line', {
           status: 'connected',
           instanceName: connectionInstanceName('line', workspaceId),
-          'credentials.channelSecret': channelSecret,
-          'credentials.channelAccessToken': accessToken,
-          'credentials.botUsername': botName,
-        },
-      },
-      { upsert: true, new: true },
-    )
+          credentials: { channelSecret, channelAccessToken: accessToken, botUsername: botName },
+    })
     return NextResponse.json(payload(workspaceId, 'connected', botName))
   } catch (error: unknown) {
     console.error('[channels:line] connect failed:', error)
@@ -91,17 +80,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    await ChannelConnection.updateOne(
-      { workspaceId, channel: 'line' },
-      {
-        $set: {
-          status: 'disconnected',
-          'credentials.channelSecret': null,
-          'credentials.channelAccessToken': null,
-        },
-      },
-    )
+    const conn = await getChannelConnection(workspaceId, 'line') as { id: string } | null
+    if (conn) await updateChannelConnection(conn.id, { status: 'disconnected', credentials: { channelSecret: null, channelAccessToken: null } })
     return NextResponse.json(payload(workspaceId, 'disconnected'))
   } catch (error: unknown) {
     console.error('[channels:line] disconnect failed:', error)

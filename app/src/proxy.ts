@@ -5,10 +5,17 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth'
 
 export function proxy(request: NextRequest): NextResponse {
+  const path = request.nextUrl.pathname
+  const publicApi = path.startsWith('/api/auth/') || path.startsWith('/api/webhooks/') || path === '/api/webchat' || path === '/api/billing/webhook'
+  if (publicApi) return NextResponse.next()
+
   const token = request.cookies.get(SESSION_COOKIE)?.value
   const session = token ? verifySessionToken(token) : null
 
   if (!session) {
+    if (path.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', request.nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
@@ -18,6 +25,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Only dashboard pages. /api/* stays open (webhooks must not be blocked).
-  matcher: '/dashboard/:path*',
+  matcher: ['/dashboard/:path*', '/api/:path*'],
 }

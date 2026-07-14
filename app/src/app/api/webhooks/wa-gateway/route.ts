@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnectionByInstance, updateChannelConnection } from '@/lib/queries'
 import { handleIncoming } from '@/lib/conversation'
-import { ChannelConnection } from '@/models/ChannelConnection'
 import type { IncomingMessage } from '@/types'
 
 /**
@@ -33,6 +32,9 @@ interface GatewayMessageData {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const expectedToken = process.env.WA_GATEWAY_WEBHOOK_TOKEN
+  if (process.env.NODE_ENV === 'production' && !expectedToken) {
+    return NextResponse.json({ error: 'Webhook token is not configured' }, { status: 503 })
+  }
   if (expectedToken && req.nextUrl.searchParams.get('token') !== expectedToken) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
@@ -49,12 +51,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!instanceName) return NextResponse.json({ status: 'ignored' })
 
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ instanceName })
+    const conn = await getChannelConnectionByInstance(instanceName) as { id: string; workspaceId: string; warmupStartedAt?: string | Date | null } | null
     if (!conn) return NextResponse.json({ status: 'unknown instance' })
 
     if (event === 'connection.update') {
-      await applyConnectionUpdate(conn._id.toString(), payload.data)
+      await applyConnectionUpdate(conn.id, conn.warmupStartedAt ?? null, payload.data)
       return NextResponse.json({ status: 'ok' })
     }
 
@@ -78,26 +79,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-async function applyConnectionUpdate(connId: string, data: unknown): Promise<void> {
+async function applyConnectionUpdate(connId: string, warmupStartedAt: string | Date | null, data: unknown): Promise<void> {
   const d = (data ?? {}) as Record<string, unknown>
   const state = d.state ?? d.connection
   if (state === 'open') {
     // wuid looks like "4917612345678@s.whatsapp.net"
     const wuid = typeof d.wuid === 'string' ? d.wuid : null
     const phone = wuid ? wuid.split('@')[0] : null
-    await ChannelConnection.findByIdAndUpdate(connId, {
-      $set: {
-        status: 'connected',
-        ...(phone ? { phoneNumber: phone } : {}),
-      },
-    })
-    // Start the warm-up clock on first connect only.
-    await ChannelConnection.updateOne(
-      { _id: connId, warmupStartedAt: null },
-      { $set: { warmupStartedAt: new Date() } },
-    )
+    await updateChannelConnection(connId, { status: 'connected', ...(phone ? { phoneNumber: phone } : {}), ...(!warmupStartedAt ? { warmupStartedAt: new Date() } : {}) })
   } else if (state === 'close') {
-    await ChannelConnection.findByIdAndUpdate(connId, { $set: { status: 'disconnected' } })
+    await updateChannelConnection(connId, { status: 'disconnected' })
   }
 }
 

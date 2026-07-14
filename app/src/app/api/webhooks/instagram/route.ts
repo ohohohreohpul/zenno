@@ -51,15 +51,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 function extractInstagramMessages(payload: unknown): IncomingMessage[] {
   const results: IncomingMessage[] = []
 
-  const entries = (payload as any)?.entry ?? []
+  interface InstagramMessaging { sender?: { id?: string }; message?: { text?: string; is_echo?: boolean } }
+  interface InstagramEntry { messaging?: InstagramMessaging[] }
+  const entries = (payload as { entry?: InstagramEntry[] } | null)?.entry ?? []
   for (const entry of entries) {
     for (const messaging of entry?.messaging ?? []) {
       const text = messaging?.message?.text
-      if (!text || messaging?.message?.is_echo) continue
+      const senderId = messaging.sender?.id
+      if (!text || !senderId || messaging?.message?.is_echo) continue
 
       results.push({
         channel: 'instagram',
-        external_contact_id: messaging.sender.id,
+        external_contact_id: senderId,
         contact_name: null,
         content: text,
         raw: messaging,

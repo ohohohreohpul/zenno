@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import {
   createInstance,
   destroyInstance,
@@ -9,11 +9,7 @@ import {
   type QrResult,
 } from '@/lib/channels/wa-gateway'
 import { currentDailyCap } from '@/lib/send-limits'
-import {
-  ChannelConnection,
-  DEFAULT_SEND_LIMITS,
-  type IChannelConnection,
-} from '@/models/ChannelConnection'
+import { DEFAULT_SEND_LIMITS, type IChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Workspace WhatsApp connection via the session gateway.
@@ -70,8 +66,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'whatsapp' })
+    const conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
     if (!conn) return NextResponse.json({ data: toPayload(null) })
 
     // Reconcile our stored status with the gateway's live session state.
@@ -82,10 +77,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       if (state === 'open' && conn.status !== 'connected') {
         conn.status = 'connected'
         if (!conn.warmupStartedAt) conn.warmupStartedAt = new Date()
-        await conn.save()
+        await updateChannelConnection(conn.id, { status: conn.status, warmupStartedAt: conn.warmupStartedAt })
       } else if (state === 'close' && conn.status === 'connected') {
         conn.status = 'disconnected'
-        await conn.save()
+        await updateChannelConnection(conn.id, { status: conn.status })
       }
       if (conn.status === 'pending_qr') {
         const fresh = await fetchQr(conn.instanceName)
@@ -113,10 +108,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await connectDb()
     const instanceName = instanceNameFor(workspaceId)
 
-    let conn = await ChannelConnection.findOne({ workspaceId, channel: 'whatsapp' })
+    let conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
     if (conn?.status === 'connected') {
       return NextResponse.json({ data: toPayload(conn) })
     }
@@ -130,14 +124,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       qr = await fetchQr(instanceName)
     }
 
-    conn = await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'whatsapp' },
-      {
-        $set: { instanceName, status: 'pending_qr' },
-        $setOnInsert: { limits: DEFAULT_SEND_LIMITS },
-      },
-      { upsert: true, new: true },
-    )
+    conn = await upsertChannelConnection(workspaceId, 'whatsapp', { instanceName, status: 'pending_qr', limits: conn?.limits ?? DEFAULT_SEND_LIMITS }) as unknown as IChannelConnection
 
     return NextResponse.json({ data: toPayload(conn, qr.qrBase64, qr.pairingCode) })
   } catch (error: unknown) {
@@ -159,11 +146,11 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const updates: Record<string, number> = {}
+  const updates: Partial<typeof DEFAULT_SEND_LIMITS> = {}
   const fields: Array<[keyof typeof body, string, number, number]> = [
-    ['daily_cap_base', 'limits.dailyCapBase', 1, 1000],
-    ['daily_cap_max', 'limits.dailyCapMax', 1, 5000],
-    ['min_delay_seconds', 'limits.minDelaySeconds', 0, 3600],
+    ['daily_cap_base', 'dailyCapBase', 1, 1000],
+    ['daily_cap_max', 'dailyCapMax', 1, 5000],
+    ['min_delay_seconds', 'minDelaySeconds', 0, 3600],
   ]
   for (const [key, path, min, max] of fields) {
     const value = body[key]
@@ -172,19 +159,15 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     if (!Number.isFinite(n) || n < min || n > max) {
       return NextResponse.json({ error: `${key} must be between ${min} and ${max}` }, { status: 400 })
     }
-    updates[path] = Math.round(n)
+    updates[path as keyof typeof DEFAULT_SEND_LIMITS] = Math.round(n)
   }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid settings provided' }, { status: 400 })
   }
 
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOneAndUpdate(
-      { workspaceId, channel: 'whatsapp' },
-      { $set: updates },
-      { new: true },
-    )
+    const existing = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
+    const conn = existing ? await updateChannelConnection(existing.id, { limits: { ...existing.limits, ...updates } }) as unknown as IChannelConnection : null
     if (!conn) return NextResponse.json({ error: 'No WhatsApp connection yet' }, { status: 404 })
     return NextResponse.json({ data: toPayload(conn) })
   } catch (error: unknown) {
@@ -196,8 +179,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
-    await connectDb()
-    const conn = await ChannelConnection.findOne({ workspaceId, channel: 'whatsapp' })
+    const conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
     if (!conn) return NextResponse.json({ data: toPayload(null) })
 
     if (isGatewayConfigured()) {
@@ -210,7 +192,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
 
     conn.status = 'disconnected'
     conn.phoneNumber = null
-    await conn.save()
+    await updateChannelConnection(conn.id, { status: 'disconnected', phoneNumber: null })
     return NextResponse.json({ data: toPayload(conn) })
   } catch (error: unknown) {
     console.error('[channels:whatsapp] disconnect failed:', error)

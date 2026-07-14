@@ -1,14 +1,21 @@
-import { connectDb } from './db'
 import { DEFAULT_SYSTEM_PROMPT, hasAiKey, type ChatTurn } from './ai'
 import { generateAgentReply } from './agent-tools'
 import { deliverMessage } from './transport'
 import { triggerCampaignsForStage } from './campaign-runner'
 import { spendCredit } from './credits'
-import { Contact, type IContact } from '@/models/Contact'
-import { Message } from '@/models/Message'
-import { Workspace } from '@/models/Workspace'
-import { WorkspaceAiConfig } from '@/models/WorkspaceAiConfig'
+import {
+  upsertContact as dbUpsertContact,
+  updateContact,
+  incrementUnread,
+  createMessage,
+  getRecentMessages,
+  getAiConfig,
+  getWorkspace,
+} from './queries'
+import type { IContact } from '@/models/Contact'
+import type { IMessage } from '@/models/Message'
 import type { LifecycleStage, IncomingMessage } from '@/types'
+import type { IGuardrails } from '@/models/WorkspaceAiConfig'
 
 const HISTORY_LIMIT = 20
 
@@ -22,12 +29,10 @@ export async function handleIncoming(
   workspaceId: string,
   incoming: IncomingMessage,
 ): Promise<void> {
-  await connectDb()
-
   const contact = await upsertContact(workspaceId, incoming)
-  const contactId = contact._id.toString()
+  const contactId = contact.id
 
-  await Message.create({
+  await createMessage({
     workspaceId,
     contactId,
     channel: incoming.channel,
@@ -35,7 +40,7 @@ export async function handleIncoming(
     content: incoming.content,
     aiGenerated: false,
   })
-  await Contact.findByIdAndUpdate(contactId, { $inc: { unread: 1 } })
+  await incrementUnread(contactId)
 
   if (!shouldAutoReply(contact)) return
 
@@ -52,20 +57,17 @@ export async function handleIncoming(
       const { describeMedia } = await import('./media')
       const desc = await describeMedia(incoming.media)
       if (desc.understood && desc.text) {
-        effectiveContent = incoming.content
-          ? `${incoming.content}\n${desc.text}`
-          : desc.text
+        effectiveContent = incoming.content ? `${incoming.content}\n${desc.text}` : desc.text
       }
     } catch {
-      // Media understanding must never block the reply — the agent can still
-      // acknowledge the message and ask the customer to clarify.
+      // Media understanding must never block the reply.
     }
   }
 
   const reply = await generateReplyWithTools(workspaceId, contact, contactId, effectiveContent)
   if (!reply) return
 
-  await Message.create({
+  await createMessage({
     workspaceId,
     contactId,
     channel: incoming.channel,
@@ -74,7 +76,6 @@ export async function handleIncoming(
     aiGenerated: true,
   })
 
-  // Best-effort transmission — the reply is already stored either way.
   await deliverMessage(workspaceId, incoming.channel, incoming.external_contact_id, reply, { kind: 'reply' })
 
   if (contact.lifecycleStage === 'inquiry') {
@@ -96,12 +97,12 @@ async function generateReplyWithTools(
   incomingText: string,
 ): Promise<string | null> {
   const [config, recent] = await Promise.all([
-    WorkspaceAiConfig.findOne({ workspaceId }).lean(),
-    Message.find({ contactId }).sort({ createdAt: -1 }).limit(HISTORY_LIMIT).lean(),
+    getAiConfig(workspaceId),
+    getRecentMessages(contactId, HISTORY_LIMIT),
   ])
 
-  const history: ChatTurn[] = recent
-    .reverse()
+  const cfg = config as { systemPrompt?: string; guardrails?: IGuardrails; knowledgeSummary?: string }
+  const history: ChatTurn[] = (recent as IMessage[])
     .slice(0, -1)
     .map((m) => ({
       role: m.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
@@ -109,14 +110,17 @@ async function generateReplyWithTools(
     }))
 
   const { guardrailsToPrompt } = await import('./guardrails')
-  const systemPrompt = (config?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT) + guardrailsToPrompt(config?.guardrails)
+  const systemPrompt = (cfg.systemPrompt ?? DEFAULT_SYSTEM_PROMPT) + guardrailsToPrompt(cfg.guardrails)
+  const knowledgeContext = cfg.knowledgeSummary
+    ? `\n\nBUSINESS KNOWLEDGE — use these facts and never invent conflicting information:\n${cfg.knowledgeSummary}`
+    : ''
   const memoryContext = contact.memorySummary
     ? `\n\nWhat you already know about this contact (use it — don't re-ask): ${contact.memorySummary}`
     : ''
   const contactContext = `\n\nContact: ${contact.name ?? 'Unknown'} | Stage: ${contact.lifecycleStage} | Channel: ${contact.channel}${memoryContext}`
 
   try {
-    const result = await generateAgentReply(systemPrompt + contactContext, history, incomingText, {
+    const result = await generateAgentReply(systemPrompt + knowledgeContext + contactContext, history, incomingText, {
       workspaceId,
       contactId,
       contactName: contact.name ?? 'Customer',
@@ -133,24 +137,20 @@ async function upsertContact(
   workspaceId: string,
   incoming: IncomingMessage,
 ): Promise<IContact> {
-  const contact = await Contact.findOneAndUpdate(
-    { workspaceId, externalId: incoming.external_contact_id, channel: incoming.channel },
-    {
-      $setOnInsert: { lifecycleStage: 'inquiry' },
-      $set: { name: incoming.contact_name ?? undefined },
-    },
-    { upsert: true, new: true },
+  const contact = await dbUpsertContact(
+    workspaceId,
+    incoming.external_contact_id,
+    incoming.channel,
+    { name: incoming.contact_name ?? undefined },
   )
-
   if (!contact) throw new Error('Failed to upsert contact')
-  return contact
+  return contact as unknown as IContact
 }
 
 async function getAgencyId(workspaceId: string): Promise<string | null> {
   try {
-    // Workspace ids may be plain strings (seeded 'ws-1') or ObjectIds.
-    const ws = await Workspace.findOne({ _id: workspaceId }).select('agencyId').lean()
-    return ws?.agencyId ?? null
+    const ws = await getWorkspace(workspaceId)
+    return (ws as { agencyId?: string } | null)?.agencyId ?? null
   } catch {
     return null
   }
@@ -160,14 +160,7 @@ export async function advanceLifecycle(
   contactId: string,
   stage: LifecycleStage,
 ): Promise<void> {
-  await connectDb()
-
-  const contact = await Contact.findByIdAndUpdate(
-    contactId,
-    { lifecycleStage: stage },
-    { new: true },
-  ).select('workspaceId name channel').lean()
-
+  const contact = await updateContact(contactId, { lifecycleStage: stage }) as IContact | null
   if (!contact) return
 
   await triggerCampaignsForStage(

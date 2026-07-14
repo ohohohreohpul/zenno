@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDb } from '@/lib/db'
+import { getChannelConnectionByPageId } from '@/lib/queries'
 import { handleIncoming } from '@/lib/conversation'
 import { MESSENGER_VERIFY_TOKEN } from '@/lib/channels/messenger-verify'
-import { ChannelConnection } from '@/models/ChannelConnection'
 
 /**
  * Meta (Messenger) webhook — app-level. GET handles Meta's subscription
@@ -41,16 +40,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (payload.object !== 'page') return NextResponse.json({ status: 'ignored' })
 
   try {
-    await connectDb()
     for (const entry of payload.entry ?? []) {
       const pageId = entry.id
       if (!pageId) continue
 
-      const conn = await ChannelConnection.findOne({
-        channel: 'messenger',
-        status: 'connected',
-        'credentials.pageId': pageId,
-      }).lean()
+      const conn = await getChannelConnectionByPageId(pageId) as { workspaceId: string } | null
       if (!conn) continue
 
       for (const event of entry.messaging ?? []) {

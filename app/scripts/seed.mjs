@@ -1,105 +1,70 @@
-// Seeds the production MongoDB with demo business data.
-// Run: MONGODB_URI=mongodb://localhost:27017/agentapp node scripts/seed.mjs
-import mongoose from 'mongoose'
+// Idempotent Supabase demo seed.
+// NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed.mjs
+import { createClient } from '@supabase/supabase-js'
+import { randomBytes, scryptSync } from 'node:crypto'
 
-const uri = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/agentapp'
-await mongoose.connect(uri)
-const db = mongoose.connection.db
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!url || !key) throw new Error('Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const ago = (minutes) => new Date(Date.now() - minutes * 60_000)
-const upcoming = (daysAhead, hour, minute = 0) => {
-  const d = new Date()
-  d.setDate(d.getDate() + daysAhead)
-  d.setHours(hour, minute, 0, 0)
-  return d
+const fail = (label, error) => { if (error) throw new Error(`${label}: ${error.message}`) }
+const upsert = async (table, rows, onConflict = 'id') => {
+  const { error } = await db.from(table).upsert(rows, { onConflict })
+  fail(table, error)
+}
+const hashPassword = (password) => {
+  const salt = randomBytes(16)
+  return `${salt.toString('hex')}:${scryptSync(password, salt, 64).toString('hex')}`
+}
+const future = (days, hour, minute = 0) => {
+  const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, minute, 0, 0); return d.toISOString()
 }
 
-// Wipe demo collections (idempotent re-seed)
-const collections = ['agencies', 'workspaces', 'contacts', 'messages', 'campaigns', 'deals', 'tasks', 'appointments', 'scheduleslots', 'commentautomations', 'workspaceaiconfigs']
-for (const c of collections) {
-  await db.collection(c).deleteMany({})
-}
-
-await db.collection('agencies').insertOne({
-  name: 'Zen Studio Agency', slug: 'zen-studio', ownerId: 'user-1', brandColor: '#1A1714',
-  credits: 450, plan: 'starter', createdAt: ago(10080), updatedAt: ago(10080),
-})
-
-await db.collection('workspaces').insertMany([
-  { _id: 'ws-1', name: 'Lotus Yoga Bangkok', slug: 'lotus-yoga', agencyId: 'agency-1', createdAt: ago(5040), updatedAt: ago(5040) },
-  { _id: 'ws-2', name: 'Serene Spa Sukhumvit', slug: 'serene-spa', agencyId: 'agency-1', createdAt: ago(2520), updatedAt: ago(2520) },
+await upsert('agencies', [{ id: 'agency-1', name: 'Zen Studio Agency', slug: 'zen-studio', owner_id: 'user-demo-1', brand_color: '#1A1714', credits: 450, plan: 'starter' }])
+await upsert('users', [{ id: 'user-demo-1', email: 'demo@studio.com', password_hash: hashPassword('demo1234'), name: 'Demo Owner', role: 'owner', agency_id: 'agency-1' }])
+await upsert('workspaces', [
+  { id: 'ws-1', name: 'Lotus Yoga Bangkok', slug: 'lotus-yoga', agency_id: 'agency-1' },
+  { id: 'ws-2', name: 'Serene Spa Sukhumvit', slug: 'serene-spa', agency_id: 'agency-1' },
 ])
-const ws1 = 'ws-1'
 
-const contactDocs = [
-  { workspaceId: ws1, externalId: '66812345678', channel: 'whatsapp', name: 'Mia Tanaka', phone: '+66812345678', instagramHandle: null, lifecycleStage: 'inquiry', tags: ['yoga', 'trial'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 2, notes: '', createdAt: ago(120), updatedAt: ago(5) },
-  { workspaceId: ws1, externalId: '66823456789', channel: 'whatsapp', name: 'Lena Hoffmann', phone: '+66823456789', instagramHandle: null, lifecycleStage: 'qualified', tags: ['spa', 'vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: true, unread: 1, notes: 'Wants to start monthly unlimited this week.', createdAt: ago(200), updatedAt: ago(30) },
-  { workspaceId: ws1, externalId: 'ig_sarahloves', channel: 'instagram', name: 'Sarah Chen', phone: null, instagramHandle: 'sarahloves', lifecycleStage: 'trial_booked', tags: ['inquiry'], botActive: false, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: '', createdAt: ago(480), updatedAt: ago(60) },
-  { workspaceId: ws1, externalId: 'line_kk2024', channel: 'line', name: 'Koko Watanabe', phone: null, instagramHandle: null, lifecycleStage: 'attended', tags: ['lead'], botActive: false, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Prefers Thai language.', createdAt: ago(1440), updatedAt: ago(240) },
-  { workspaceId: ws1, externalId: '66834567890', channel: 'whatsapp', name: 'Priya Nair', phone: '+66834567890', instagramHandle: null, lifecycleStage: 'rebooked', tags: ['retreat'], botActive: true, dnd: true, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Attended March retreat.', createdAt: ago(2880), updatedAt: ago(480) },
+const contacts = [
+  { id: 'contact-1', workspace_id: 'ws-1', external_id: '66812345678', channel: 'whatsapp', name: 'Mia Tanaka', phone: '+66812345678', lifecycle_stage: 'inquiry', tags: ['yoga','trial'], unread: 2 },
+  { id: 'contact-2', workspace_id: 'ws-1', external_id: '66823456789', channel: 'whatsapp', name: 'Lena Hoffmann', phone: '+66823456789', lifecycle_stage: 'qualified', tags: ['spa','vip'], attention_required: true, unread: 1, notes: 'Wants to start monthly unlimited this week.' },
+  { id: 'contact-3', workspace_id: 'ws-1', external_id: 'ig_sarahloves', channel: 'instagram', name: 'Sarah Chen', instagram_handle: 'sarahloves', lifecycle_stage: 'trial_booked', tags: ['inquiry'], bot_active: false },
+  { id: 'contact-4', workspace_id: 'ws-1', external_id: 'line_kk2024', channel: 'line', name: 'Koko Watanabe', lifecycle_stage: 'attended', tags: ['lead'], bot_active: false, chat_status: 'closed', notes: 'Prefers Thai language.' },
+  { id: 'contact-5', workspace_id: 'ws-1', external_id: '66834567890', channel: 'whatsapp', name: 'Priya Nair', phone: '+66834567890', lifecycle_stage: 'rebooked', tags: ['retreat'], dnd: true, chat_status: 'closed' },
 ]
-const cResult = await db.collection('contacts').insertMany(contactDocs)
-const cid = (i) => cResult.insertedIds[i].toString()
+await upsert('contacts', contacts)
 
-await db.collection('messages').insertMany([
-  { workspaceId: ws1, contactId: cid(0), channel: 'whatsapp', direction: 'inbound', content: 'Hi! I saw your yoga studio on Instagram. What classes do you have?', aiGenerated: false, createdAt: ago(125) },
-  { workspaceId: ws1, contactId: cid(0), channel: 'whatsapp', direction: 'outbound', content: 'Hi Mia! Welcome to Lotus Yoga. We have morning flows, evening yin, and weekend workshops. Would you like to book a free trial class?', aiGenerated: true, createdAt: ago(124) },
-  { workspaceId: ws1, contactId: cid(0), channel: 'whatsapp', direction: 'inbound', content: 'That sounds amazing! What time is the morning flow?', aiGenerated: false, createdAt: ago(10) },
-  { workspaceId: ws1, contactId: cid(1), channel: 'whatsapp', direction: 'inbound', content: 'Do you offer monthly memberships?', aiGenerated: false, createdAt: ago(205) },
-  { workspaceId: ws1, contactId: cid(1), channel: 'whatsapp', direction: 'outbound', content: 'Yes! Our monthly unlimited is 2,500 THB. We also have a 10-class pack at 1,800 THB. Which suits you better?', aiGenerated: true, createdAt: ago(204) },
-  { workspaceId: ws1, contactId: cid(1), channel: 'whatsapp', direction: 'inbound', content: 'The monthly unlimited sounds good. Can I start this week?', aiGenerated: false, createdAt: ago(35) },
-  { workspaceId: ws1, contactId: cid(2), channel: 'instagram', direction: 'inbound', content: 'Your studio looks so peaceful. I want to join!', aiGenerated: false, createdAt: ago(485) },
-  { workspaceId: ws1, contactId: cid(2), channel: 'instagram', direction: 'outbound', content: "Thank you Sarah! I've reserved a spot for you in tomorrow's 9am trial class. Shall I confirm?", aiGenerated: true, createdAt: ago(483) },
-  { workspaceId: ws1, contactId: cid(3), channel: 'line', direction: 'inbound', content: 'สวัสดีค่ะ อยากถามเรื่องคลาสโยคะค่ะ', aiGenerated: false, createdAt: ago(1450) },
-  { workspaceId: ws1, contactId: cid(3), channel: 'line', direction: 'outbound', content: 'สวัสดีค่ะ Koko! ยินดีต้อนรับสู่ Lotus Yoga นะคะ', aiGenerated: true, createdAt: ago(1448) },
+await upsert('messages', [
+  { id: 'msg-1', workspace_id: 'ws-1', contact_id: 'contact-1', channel: 'whatsapp', direction: 'inbound', content: 'Hi! What classes do you have?', ai_generated: false },
+  { id: 'msg-2', workspace_id: 'ws-1', contact_id: 'contact-1', channel: 'whatsapp', direction: 'outbound', content: 'Hi Mia! We have Morning Flow, Evening Yin, and weekend workshops. Would you like a free trial?', ai_generated: true },
+  { id: 'msg-3', workspace_id: 'ws-1', contact_id: 'contact-2', channel: 'whatsapp', direction: 'inbound', content: 'Do you offer monthly memberships?', ai_generated: false },
+  { id: 'msg-4', workspace_id: 'ws-1', contact_id: 'contact-2', channel: 'whatsapp', direction: 'outbound', content: 'Yes—monthly unlimited is 2,500 THB. Would you like to start this week?', ai_generated: true },
 ])
 
-await db.collection('scheduleslots').insertMany([
-  { workspaceId: ws1, className: 'Morning Flow', dayOfWeek: 1, time: '07:00', durationMin: 60, capacity: 14, booked: 9, instructor: 'Nok' },
-  { workspaceId: ws1, className: 'Morning Flow', dayOfWeek: 1, time: '09:00', durationMin: 60, capacity: 14, booked: 13, instructor: 'Nok' },
-  { workspaceId: ws1, className: 'Morning Flow', dayOfWeek: 3, time: '07:00', durationMin: 60, capacity: 14, booked: 6, instructor: 'Ploy' },
-  { workspaceId: ws1, className: 'Morning Flow', dayOfWeek: 5, time: '09:00', durationMin: 60, capacity: 14, booked: 8, instructor: 'Nok' },
-  { workspaceId: ws1, className: 'Evening Yin', dayOfWeek: 2, time: '18:30', durationMin: 75, capacity: 12, booked: 10, instructor: 'Ploy' },
-  { workspaceId: ws1, className: 'Evening Yin', dayOfWeek: 4, time: '18:30', durationMin: 75, capacity: 12, booked: 5, instructor: 'Mali' },
-  { workspaceId: ws1, className: 'Weekend Workshop', dayOfWeek: 6, time: '10:00', durationMin: 120, capacity: 20, booked: 12, instructor: 'Mali' },
+await upsert('schedule_slots', [
+  { id: 'slot-1', workspace_id: 'ws-1', class_name: 'Morning Flow', day_of_week: 1, time: '07:00', duration_min: 60, capacity: 14, booked: 9, instructor: 'Nok' },
+  { id: 'slot-2', workspace_id: 'ws-1', class_name: 'Morning Flow', day_of_week: 3, time: '09:00', duration_min: 60, capacity: 14, booked: 6, instructor: 'Ploy' },
+  { id: 'slot-3', workspace_id: 'ws-1', class_name: 'Evening Yin', day_of_week: 4, time: '18:30', duration_min: 75, capacity: 12, booked: 5, instructor: 'Mali' },
+  { id: 'slot-4', workspace_id: 'ws-1', class_name: 'Weekend Workshop', day_of_week: 6, time: '10:00', duration_min: 120, capacity: 20, booked: 12, instructor: 'Mali' },
 ])
-
-await db.collection('appointments').insertMany([
-  { workspaceId: ws1, contactId: cid(2), contactName: 'Sarah Chen', className: 'Morning Flow (Trial)', startsAt: upcoming(1, 9), durationMin: 60, channel: 'instagram', kind: 'trial', createdAt: ago(480) },
-  { workspaceId: ws1, contactId: cid(1), contactName: 'Lena Hoffmann', className: 'Membership Consult', startsAt: upcoming(2, 14, 30), durationMin: 30, channel: 'whatsapp', kind: 'consult', createdAt: ago(200) },
+await upsert('appointments', [
+  { id: 'appt-1', workspace_id: 'ws-1', contact_id: 'contact-3', contact_name: 'Sarah Chen', class_name: 'Morning Flow (Trial)', starts_at: future(1, 9), duration_min: 60, channel: 'instagram', kind: 'trial' },
 ])
-
-await db.collection('deals').insertMany([
-  { workspaceId: ws1, contactId: cid(0), name: 'Yoga Package 10x', contactName: 'Mia Tanaka', value: 4500, currency: 'THB', stage: 'lead', channel: 'whatsapp', createdAt: ago(100), updatedAt: ago(100) },
-  { workspaceId: ws1, contactId: cid(1), name: 'Private Coaching', contactName: 'Lena Hoffmann', value: 18000, currency: 'THB', stage: 'lead', channel: 'whatsapp', createdAt: ago(400), updatedAt: ago(400) },
-  { workspaceId: ws1, contactId: cid(2), name: 'Annual Plan', contactName: 'Sarah Chen', value: 28800, currency: 'THB', stage: 'qualified', channel: 'whatsapp', createdAt: ago(600), updatedAt: ago(600) },
-  { workspaceId: ws1, contactId: null, name: 'Corporate Wellness', contactName: 'Tom Reeves', value: 45000, currency: 'THB', stage: 'qualified', channel: 'whatsapp', createdAt: ago(700), updatedAt: ago(700) },
+await upsert('deals', [
+  { id: 'deal-1', workspace_id: 'ws-1', contact_id: 'contact-1', contact_name: 'Mia Tanaka', name: 'Yoga Package 10x', value: 4500, currency: 'THB', stage: 'lead', channel: 'whatsapp' },
+  { id: 'deal-2', workspace_id: 'ws-1', contact_id: 'contact-2', contact_name: 'Lena Hoffmann', name: 'Monthly Unlimited', value: 2500, currency: 'THB', stage: 'qualified', channel: 'whatsapp' },
 ])
+await upsert('tasks', [{ id: 'task-1', workspace_id: 'ws-1', contact_id: 'contact-2', title: 'Confirm membership payment', contact_name: 'Lena Hoffmann', priority: 'high', status: 'todo', due_date: future(1, 12) }])
+await upsert('campaigns', [{ id: 'campaign-1', workspace_id: 'ws-1', name: 'Trial follow-up', status: 'active', trigger_stage: 'trial_booked', goal: 'Help the customer confirm and attend their trial class.', flow: [] }])
+await upsert('comment_automations', [{ id: 'automation-1', workspace_id: 'ws-1', keyword: 'CLASS', post_label: 'Morning Flow reel', opening_dm: 'Hi {{name}}! Want me to book you a free trial?', status: 'active' }])
+await upsert('workspace_ai_configs', [{
+  id: 'ai-config-1', workspace_id: 'ws-1',
+  system_prompt: 'You are the 24/7 receptionist and sales assistant for Lotus Yoga Bangkok. Answer accurately, qualify interest, and help customers book. Keep replies concise and use the customer\'s language. Escalate refunds, complaints, medical questions, and payment problems to a human.',
+  knowledge_summary: 'Business: Lotus Yoga Bangkok. Location: Sukhumvit Soi 23, Bangkok. Classes: Morning Flow at 7am and 9am, Evening Yin at 6:30pm, Weekend Workshop Saturday at 10am. Pricing: drop-in 450 THB, 10-class pack 1,800 THB, monthly unlimited 2,500 THB. First-time visitors receive one free trial class.',
+  guardrails: { alwaysEscalateTopics: ['refunds','complaints','medical advice','payment disputes'], maxDiscountPercent: 0, businessHoursOnly: false },
+}], 'workspace_id')
 
-await db.collection('tasks').insertMany([
-  { workspaceId: ws1, contactId: cid(1), title: 'Confirm monthly membership payment', contactName: 'Lena Hoffmann', priority: 'high', status: 'todo', dueDate: upcoming(1, 12), createdAt: ago(30), updatedAt: ago(30) },
-  { workspaceId: ws1, contactId: cid(2), title: 'Prepare trial class welcome pack', contactName: 'Sarah Chen', priority: 'medium', status: 'todo', dueDate: upcoming(2, 12), createdAt: ago(60), updatedAt: ago(60) },
-  { workspaceId: ws1, contactId: cid(0), title: 'Follow up on morning flow question', contactName: 'Mia Tanaka', priority: 'low', status: 'in_progress', dueDate: upcoming(1, 9), createdAt: ago(120), updatedAt: ago(15) },
-])
-
-await db.collection('commentautomations').insertMany([
-  { workspaceId: ws1, keyword: 'CLASS', postLabel: 'Morning Flow reel · Jun 28', openingDm: "Hi {{name}}! Here's our full class schedule. Want me to book you a free trial?", status: 'active', stats: { commentsCaptured: 47, dmsSent: 44, booked: 9 }, createdAt: ago(8640) },
-  { workspaceId: ws1, keyword: 'RETREAT', postLabel: 'Weekend retreat carousel · Jun 30', openingDm: 'Hi {{name}}! The next retreat is coming up — want the details and early-bird pricing?', status: 'paused', stats: { commentsCaptured: 12, dmsSent: 12, booked: 2 }, createdAt: ago(5760) },
-])
-
-await db.collection('workspaceaiconfigs').insertOne({
-  workspaceId: ws1,
-  systemPrompt: `You are a warm and knowledgeable assistant for Lotus Yoga Bangkok. Help potential and existing students with class schedules, pricing, bookings, and general questions.
-
-Always be friendly, concise, and encouraging. Keep replies to 2-4 sentences. When someone seems interested, offer to book a free trial class. Respond in the same language the customer uses.
-
-Key information:
-- Classes: Morning Flow (7am, 9am), Evening Yin (6:30pm), Weekend Workshop (Sat 10am)
-- Pricing: Drop-in 450 THB, 10-class pack 1,800 THB, Monthly unlimited 2,500 THB
-- Free trial class for first-time visitors
-- Location: Sukhumvit Soi 23, Bangkok`,
-  createdAt: new Date(), updatedAt: new Date(),
-})
-
-console.log('Seeded workspace ws-1 with demo business data.')
-await mongoose.disconnect()
+console.log('Seeded Supabase demo workspace ws-1 (demo@studio.com / demo1234).')

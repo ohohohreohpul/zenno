@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { WorkspaceAiConfig } from '@/models/WorkspaceAiConfig'
+import { getAiConfig, upsertAiConfig } from '@/lib/queries'
 import { DEFAULT_GUARDRAILS } from '@/lib/guardrails'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
@@ -10,22 +8,12 @@ const DEFAULT_WORKSPACE_ID = 'ws-1'
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = req.nextUrl.searchParams.get('workspaceId') ?? DEFAULT_WORKSPACE_ID
 
-  if (IS_MOCK) {
-    return NextResponse.json({
-      data: {
-        workspaceId,
-        systemPrompt: MockDB.getSystemPrompt(workspaceId),
-        guardrails: MockDB.getGuardrails(workspaceId),
-      },
-    })
-  }
-
-  await connectDb()
-  const config = await WorkspaceAiConfig.findOne({ workspaceId }).lean()
+  const config = await getAiConfig(workspaceId) as { systemPrompt?: string; knowledgeSummary?: string; guardrails?: unknown }
   return NextResponse.json({
     data: {
       workspaceId,
       systemPrompt: config?.systemPrompt ?? '',
+      knowledgeSummary: config?.knowledgeSummary ?? '',
       guardrails: config?.guardrails ?? DEFAULT_GUARDRAILS,
     },
   })
@@ -40,6 +28,7 @@ const guardrailsSchema = z.object({
 const updateSchema = z.object({
   workspaceId: z.string().min(1).default(DEFAULT_WORKSPACE_ID),
   systemPrompt: z.string().min(1).max(20000).optional(),
+  knowledgeSummary: z.string().max(50000).optional(),
   guardrails: guardrailsSchema.optional(),
 })
 
@@ -51,21 +40,15 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   const parsed = updateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { workspaceId, systemPrompt, guardrails } = parsed.data
-  if (!systemPrompt && !guardrails) {
+  const { workspaceId, systemPrompt, knowledgeSummary, guardrails } = parsed.data
+  if (!systemPrompt && knowledgeSummary === undefined && !guardrails) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 422 })
   }
 
-  if (IS_MOCK) {
-    if (systemPrompt) MockDB.setSystemPrompt(workspaceId, systemPrompt)
-    if (guardrails) MockDB.setGuardrails(workspaceId, guardrails)
-    return NextResponse.json({ data: { workspaceId, systemPrompt, guardrails } })
-  }
-
-  await connectDb()
   const update: Record<string, unknown> = {}
   if (systemPrompt) update.systemPrompt = systemPrompt
+  if (knowledgeSummary !== undefined) update.knowledgeSummary = knowledgeSummary
   if (guardrails) update.guardrails = guardrails
-  await WorkspaceAiConfig.findOneAndUpdate({ workspaceId }, { $set: update }, { upsert: true })
-  return NextResponse.json({ data: { workspaceId, systemPrompt, guardrails } })
+  const config = await upsertAiConfig(workspaceId, update)
+  return NextResponse.json({ data: config })
 }

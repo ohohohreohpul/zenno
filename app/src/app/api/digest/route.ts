@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { Contact } from '@/models/Contact'
-import { Message } from '@/models/Message'
-import { Appointment } from '@/models/Appointment'
+import { getAppointments, getContacts, getMessages } from '@/lib/queries'
 import { hasAiKey } from '@/lib/ai'
 
 const DEFAULT_WORKSPACE_ID = 'ws-1'
@@ -90,14 +87,17 @@ function buildMockDigest(workspaceId: string, start: Date, end: Date, label: str
 }
 
 async function buildDbDigest(workspaceId: string, start: Date, end: Date, label: string): Promise<DigestData> {
-  await connectDb()
-  const range = { $gte: start, $lt: end }
-
-  const [messages, bookings, flagged] = await Promise.all([
-    Message.find({ workspaceId, createdAt: range }).sort({ createdAt: 1 }).lean(),
-    Appointment.find({ workspaceId, createdAt: range }).lean(),
-    Contact.find({ workspaceId, attentionRequired: true }).select('name notes').lean(),
-  ])
+  interface ContactRow { id: string; name?: string; channel: string; attentionRequired?: boolean; notes?: string }
+  interface MessageRow { contactId: string; direction: string; content: string; aiGenerated?: boolean; createdAt: string | Date }
+  interface AppointmentRow { contactName: string; className: string; startsAt: string | Date; kind: string; createdAt: string | Date }
+  const contacts = await getContacts(workspaceId) as unknown as ContactRow[]
+  const [groups, allBookings] = await Promise.all([
+    Promise.all(contacts.map((c) => getMessages(c.id))), getAppointments(workspaceId),
+  ]) as [MessageRow[][], AppointmentRow[]]
+  const within = (value: string | Date) => { const d = new Date(value); return d >= start && d < end }
+  const messages = groups.flat().filter((m) => within(m.createdAt))
+  const bookings = allBookings.filter((a) => within(a.createdAt))
+  const flagged = contacts.filter((c) => c.attentionRequired)
 
   const byContact = new Map<string, typeof messages>()
   for (const m of messages) {
@@ -105,9 +105,7 @@ async function buildDbDigest(workspaceId: string, start: Date, end: Date, label:
     byContact.set(m.contactId, [...list, m])
   }
 
-  const contactIds = [...byContact.keys()]
-  const contacts = await Contact.find({ _id: { $in: contactIds } }).select('name channel').lean()
-  const contactById = new Map(contacts.map((c) => [c._id.toString(), c]))
+  const contactById = new Map(contacts.map((c) => [c.id, c]))
 
   return {
     date: label,
@@ -118,7 +116,7 @@ async function buildDbDigest(workspaceId: string, start: Date, end: Date, label:
       contactName: a.contactName, className: a.className, startsAt: a.startsAt, kind: a.kind,
     })),
     escalations: flagged.map((c) => ({
-      contactId: c._id.toString(),
+      contactId: c.id,
       name: c.name ?? 'Unknown',
       note: c.notes || 'Flagged for human attention',
     })),

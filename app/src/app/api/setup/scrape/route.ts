@@ -173,6 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       data: {
         systemPrompt: fallbackPrompt(businessType, combined, url.toString()),
+        knowledgeSummary: combined,
         siteTextPreview: combined.slice(0, 400),
         pagesScraped: pagesFetched,
         aiGenerated: false,
@@ -188,12 +189,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       1600,
     )
     return NextResponse.json({
-      data: { systemPrompt, siteTextPreview: combined.slice(0, 400), pagesScraped: pagesFetched, aiGenerated: true },
+      data: { systemPrompt, knowledgeSummary: combined, siteTextPreview: combined.slice(0, 400), pagesScraped: pagesFetched, aiGenerated: true },
     })
   } catch {
     return NextResponse.json({
       data: {
         systemPrompt: fallbackPrompt(businessType, combined, url.toString()),
+        knowledgeSummary: combined,
         siteTextPreview: combined.slice(0, 400),
         pagesScraped: pagesFetched,
         aiGenerated: false,

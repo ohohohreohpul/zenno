@@ -56,10 +56,9 @@ export function verifyLineSignatureWith(
   signature: string,
 ): boolean {
   if (!secret) return false
-  const crypto = require('crypto') as typeof import('crypto')
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('base64')
+  const expected = createHmac('sha256', secret).update(rawBody).digest('base64')
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature, 'base64'), Buffer.from(expected, 'base64'))
+    return timingSafeEqual(Buffer.from(signature, 'base64'), Buffer.from(expected, 'base64'))
   } catch {
     return false
   }
@@ -71,3 +70,4 @@ export function verifyLineSignature(rawBody: string, signature: string): boolean
   if (!secret) return false
   return verifyLineSignatureWith(secret, rawBody, signature)
 }
+import { createHmac, timingSafeEqual } from 'crypto'

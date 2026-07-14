@@ -1,9 +1,4 @@
-import { IS_MOCK, MockDB } from './mock-store'
-import { connectDb } from './db'
-import { Campaign } from '@/models/Campaign'
-import { Contact } from '@/models/Contact'
-import { Message } from '@/models/Message'
-import { WorkspaceAiConfig } from '@/models/WorkspaceAiConfig'
+import { createMessage, getAiConfig, getCampaign, getCampaigns, getContact, getContacts } from './queries'
 import { DEFAULT_SYSTEM_PROMPT, type ChatTurn } from './ai'
 
 /**
@@ -51,14 +46,8 @@ interface EligibleContact {
 }
 
 async function findEligibleContacts(workspaceId: string, triggerStage: string): Promise<EligibleContact[]> {
-  if (IS_MOCK) {
-    return MockDB.getContacts(workspaceId)
-      .filter((c) => c.lifecycleStage === triggerStage && !c.dnd && c.botActive)
-      .map((c) => ({ id: c._id, name: c.name, channel: c.channel, externalId: c.externalId, memorySummary: c.memorySummary, lifecycleStage: c.lifecycleStage }))
-  }
-  await connectDb()
-  const contacts = await Contact.find({ workspaceId, lifecycleStage: triggerStage, dnd: false, botActive: true }).lean()
-  return contacts.map((c) => ({ id: c._id.toString(), name: c.name, channel: c.channel, externalId: c.externalId, memorySummary: c.memorySummary, lifecycleStage: c.lifecycleStage }))
+  const contacts = await getContacts(workspaceId) as unknown as Array<EligibleContact & { dnd?: boolean; botActive?: boolean }>
+  return contacts.filter((c) => c.lifecycleStage === triggerStage && !c.dnd && c.botActive !== false)
 }
 
 async function generateOpeningMessage(
@@ -72,14 +61,9 @@ async function generateOpeningMessage(
   let systemPrompt = DEFAULT_SYSTEM_PROMPT
   let knowledge = ''
   try {
-    if (IS_MOCK) {
-      systemPrompt = MockDB.getSystemPrompt(workspaceId)
-    } else {
-      await connectDb()
-      const cfg = await WorkspaceAiConfig.findOne({ workspaceId }).lean()
-      systemPrompt = cfg?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT
-      knowledge = cfg?.knowledgeSummary ?? ''
-    }
+    const cfg = await getAiConfig(workspaceId) as { systemPrompt?: string; knowledgeSummary?: string }
+    systemPrompt = cfg.systemPrompt || DEFAULT_SYSTEM_PROMPT
+    knowledge = cfg.knowledgeSummary ?? ''
   } catch {
     // fall back to default prompt
   }
@@ -115,16 +99,11 @@ async function sendCampaignMessage(
     content: interpolate(content, contact.name),
     aiGenerated: true,
   }
-  if (IS_MOCK) {
-    MockDB.addMessage(message)
-    return
-  }
-  await connectDb()
-  await Message.create(message)
+  await createMessage(message)
 
   // Callers don't always carry externalId — resolve it before transmitting.
   const externalId = contact.externalId
-    ?? (await Contact.findById(contact.id).select('externalId').lean())?.externalId
+    ?? ((await getContact(contact.id)) as { externalId?: string } | null)?.externalId
   if (externalId) {
     const { deliverMessage } = await import('./transport')
     await deliverMessage(workspaceId, contact.channel, externalId, message.content, { kind: 'bulk' })
@@ -140,13 +119,8 @@ interface CampaignData {
 }
 
 async function loadCampaign(campaignId: string): Promise<CampaignData | null> {
-  if (IS_MOCK) {
-    const c = MockDB.getCampaign(campaignId)
-    return c ? { workspaceId: c.workspaceId, triggerStage: c.triggerStage, status: c.status, goal: c.goal ?? '', flow: c.flow } : null
-  }
-  await connectDb()
-  const c = await Campaign.findById(campaignId).lean()
-  return c ? { workspaceId: c.workspaceId, triggerStage: c.triggerStage ?? null, status: c.status, goal: (c as { goal?: string }).goal ?? '', flow: (c.flow ?? []) as unknown[] } : null
+  const c = await getCampaign(campaignId) as unknown as CampaignData | null
+  return c ? { workspaceId: c.workspaceId, triggerStage: c.triggerStage ?? null, status: c.status, goal: c.goal ?? '', flow: c.flow ?? [] } : null
 }
 
 /**
@@ -189,14 +163,10 @@ interface ActiveCampaign {
 }
 
 async function findActiveCampaignsForStage(workspaceId: string, stage: string): Promise<ActiveCampaign[]> {
-  if (IS_MOCK) {
-    return MockDB.getCampaigns(workspaceId)
-      .filter((c) => c.status === 'active' && c.triggerStage === stage)
-      .map((c) => ({ _id: c._id, goal: c.goal ?? '', flow: c.flow }))
-  }
-  await connectDb()
-  const campaigns = await Campaign.find({ workspaceId, status: 'active', triggerStage: stage }).lean()
-  return campaigns.map((c) => ({ _id: c._id.toString(), goal: (c as { goal?: string }).goal ?? '', flow: (c.flow ?? []) as unknown[] }))
+  const campaigns = await getCampaigns(workspaceId) as unknown as Array<{ id: string; status: string; triggerStage?: string; goal?: string; flow?: unknown[] }>
+  return campaigns
+    .filter((c) => c.status === 'active' && c.triggerStage === stage)
+    .map((c) => ({ _id: c.id, goal: c.goal ?? '', flow: c.flow ?? [] }))
 }
 
 /**

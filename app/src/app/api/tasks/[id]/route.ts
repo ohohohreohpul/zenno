@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { Task } from '@/models/Task'
-import { serializeDoc } from '@/lib/serialize'
+import { deleteTask, getTask, updateTask } from '@/lib/queries'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -30,29 +27,15 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     ? { ...rest, dueDate: dueDate ? new Date(dueDate) : null }
     : rest
 
-  if (IS_MOCK) {
-    const updated = MockDB.updateTask(id, patch)
-    if (!updated) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    return NextResponse.json({ data: updated })
-  }
-
-  await connectDb()
-  const updated = await Task.findByIdAndUpdate(id, { $set: patch }, { new: true }).lean()
+  const updated = await updateTask(id, patch)
   if (!updated) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-  return NextResponse.json({ data: serializeDoc(updated) })
+  return NextResponse.json({ data: updated })
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params): Promise<NextResponse> {
   const { id } = await params
 
-  if (IS_MOCK) {
-    const removed = MockDB.deleteTask(id)
-    if (!removed) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    return NextResponse.json({ data: { id } })
-  }
-
-  await connectDb()
-  const deleted = await Task.findByIdAndDelete(id).lean()
-  if (!deleted) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  if (!await getTask(id)) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  await deleteTask(id)
   return NextResponse.json({ data: { id } })
 }

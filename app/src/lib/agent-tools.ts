@@ -1,14 +1,17 @@
 import type Anthropic from '@anthropic-ai/sdk'
-import { isValidObjectId } from 'mongoose'
-import { IS_MOCK, MockDB } from './mock-store'
-import { connectDb } from './db'
-import { ScheduleSlot } from '@/models/ScheduleSlot'
-import { Appointment } from '@/models/Appointment'
-import { Contact } from '@/models/Contact'
-import { Deal, type DealStage } from '@/models/Deal'
+import type { DealStage } from '@/models/Deal'
+import {
+  getScheduleSlots,
+  getScheduleSlot,
+  incrementSlotBooking,
+  createAppointment,
+  updateContact,
+  findOpenDealByContact,
+  createDeal,
+  updateDeal,
+} from './queries'
 import type { ChatTurn } from './ai'
 
-const MAX_TOOL_ROUNDS = 5
 const MAX_REPLY_TOKENS = 500
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -71,32 +74,8 @@ export interface AgentToolStore {
   updateDeal(id: string, patch: DealPatch): Promise<void>
 }
 
-export const mockToolStore: AgentToolStore = {
-  getSchedule: async (workspaceId) => MockDB.getSchedule(workspaceId),
-  getScheduleSlot: async (id) => MockDB.getScheduleSlot(id),
-  incrementSlotBooking: async (id) => MockDB.incrementSlotBooking(id),
-  createAppointment: async (data) => {
-    const appt = MockDB.createAppointment(data)
-    return { _id: appt._id }
-  },
-  updateContact: async (id, patch) => {
-    MockDB.updateContact(id, patch)
-  },
-  getOpenDealForContact: async (contactId) => {
-    const open = MockDB.findOpenDealByContact(contactId)
-    return open ? { _id: open._id, stage: open.stage, value: open.value } : null
-  },
-  createDeal: async (data) => {
-    const deal = MockDB.createDeal(data)
-    return { _id: deal._id }
-  },
-  updateDeal: async (id, patch) => {
-    MockDB.updateDeal(id, patch)
-  },
-}
-
 interface LeanSlot {
-  _id: unknown
+  id: unknown
   workspaceId: string
   className: string
   dayOfWeek: number
@@ -109,7 +88,7 @@ interface LeanSlot {
 
 function toSlotData(slot: LeanSlot): ScheduleSlotData {
   return {
-    _id: String(slot._id),
+    _id: String(slot.id),
     workspaceId: slot.workspaceId,
     className: slot.className,
     dayOfWeek: slot.dayOfWeek,
@@ -123,65 +102,38 @@ function toSlotData(slot: LeanSlot): ScheduleSlotData {
 
 export const dbToolStore: AgentToolStore = {
   getSchedule: async (workspaceId) => {
-    await connectDb()
-    const slots = await ScheduleSlot.find({ workspaceId }).lean<LeanSlot[]>()
-    return slots.map(toSlotData)
+    return (await getScheduleSlots(workspaceId) as unknown as LeanSlot[]).map(toSlotData)
   },
   getScheduleSlot: async (id) => {
-    // The id comes from the model, which may invent non-ObjectId strings —
-    // treat "not a valid id" as "not found" so the agent can self-correct.
-    if (!isValidObjectId(id)) return null
-    await connectDb()
-    const slot = await ScheduleSlot.findById(id).lean<LeanSlot | null>()
+    const slot = await getScheduleSlot(id) as unknown as LeanSlot | null
     return slot ? toSlotData(slot) : null
   },
   incrementSlotBooking: async (id) => {
-    if (!isValidObjectId(id)) return null
-    await connectDb()
-    const slot = await ScheduleSlot.findById(id).lean<LeanSlot | null>()
-    if (!slot || slot.booked >= slot.capacity) return null
-    // Conditional update on the previously observed value avoids overbooking races.
-    const updated = await ScheduleSlot.findOneAndUpdate(
-      { _id: id, booked: slot.booked },
-      { $inc: { booked: 1 } },
-      { new: true },
-    ).lean<LeanSlot | null>()
+    const updated = await incrementSlotBooking(id) as unknown as LeanSlot | null
     return updated ? toSlotData(updated) : null
   },
   createAppointment: async (data) => {
-    await connectDb()
-    const appt = await Appointment.create(data)
-    return { _id: String(appt._id) }
+    const appt = await createAppointment(data as unknown as Record<string, unknown>)
+    return { _id: String((appt as { id: string }).id) }
   },
   updateContact: async (id, patch) => {
-    await connectDb()
-    await Contact.findByIdAndUpdate(id, { $set: patch })
+    await updateContact(id, patch as unknown as Record<string, unknown>)
   },
   getOpenDealForContact: async (contactId) => {
-    await connectDb()
-    const deal = await Deal.findOne({
-      contactId,
-      stage: { $nin: ['won', 'lost'] },
-    })
-      .sort({ updatedAt: -1 })
-      .lean()
-      .select('_id stage value')
-    return deal ? { _id: String(deal._id), stage: deal.stage as DealStage, value: deal.value } : null
+    const deal = await findOpenDealByContact(contactId)
+    return deal ? { _id: String((deal as { id?: string; _id?: string }).id ?? (deal as { _id?: string })._id), stage: deal.stage as DealStage, value: deal.value } : null
   },
   createDeal: async (data) => {
-    await connectDb()
-    const deal = await Deal.create(data)
-    return { _id: String(deal._id) }
+    const deal = await createDeal(data as unknown as Record<string, unknown>)
+    return { _id: String((deal as { id: string }).id) }
   },
   updateDeal: async (id, patch) => {
-    if (!isValidObjectId(id)) return
-    await connectDb()
-    await Deal.findByIdAndUpdate(id, { $set: patch })
+    await updateDeal(id, patch as unknown as Record<string, unknown>)
   },
 }
 
 function getToolStore(): AgentToolStore {
-  return IS_MOCK ? mockToolStore : dbToolStore
+  return dbToolStore
 }
 
 const TOOLS: Anthropic.Tool[] = [

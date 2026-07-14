@@ -23,15 +23,13 @@ export function verifyMetaSignature(rawBody: string, signature: string): boolean
   const secret = process.env.META_APP_SECRET
   if (!secret) return false
 
-  const crypto = require('crypto') as typeof import('crypto')
-  const expected = crypto
-    .createHmac('sha256', secret)
+  const expected = createHmac('sha256', secret)
     .update(rawBody)
     .digest('hex')
 
   const provided = signature.replace('sha256=', '')
   try {
-    return crypto.timingSafeEqual(
+    return timingSafeEqual(
       Buffer.from(provided, 'hex'),
       Buffer.from(expected, 'hex'),
     )
@@ -39,3 +37,4 @@ export function verifyMetaSignature(rawBody: string, signature: string): boolean
     return false
   }
 }
+import { createHmac, timingSafeEqual } from 'crypto'

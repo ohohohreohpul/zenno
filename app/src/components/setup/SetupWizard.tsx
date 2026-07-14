@@ -117,6 +117,7 @@ export function SetupWizard() {
   const [step, setStep] = useState(0)
   const [businessType, setBusinessType] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [knowledgeSummary, setKnowledgeSummary] = useState('')
   const [isPromptFromWebsite, setIsPromptFromWebsite] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState('')
@@ -143,9 +144,10 @@ export function SetupWizard() {
         return
       }
       const body = (await response.json()) as {
-        data: { systemPrompt: string; aiGenerated: boolean }
+        data: { systemPrompt: string; knowledgeSummary: string; aiGenerated: boolean }
       }
       setSystemPrompt(body.data.systemPrompt)
+      setKnowledgeSummary(body.data.knowledgeSummary)
       setIsPromptFromWebsite(body.data.aiGenerated)
       setStep(2)
     } catch {
@@ -157,6 +159,7 @@ export function SetupWizard() {
 
   const handleSkipScan = () => {
     setSystemPrompt(buildTemplatePrompt(businessType))
+    setKnowledgeSummary('')
     setIsPromptFromWebsite(false)
     setScanError('')
     setStep(2)
@@ -169,7 +172,7 @@ export function SetupWizard() {
       const response = await fetch('/api/ai-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: WORKSPACE_ID, systemPrompt }),
+        body: JSON.stringify({ workspaceId: WORKSPACE_ID, systemPrompt, knowledgeSummary }),
       })
       if (!response.ok) {
         setSaveError(await readApiError(response, 'Could not save your instructions. Please try again.'))

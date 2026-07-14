@@ -57,7 +57,8 @@ export function InboxView() {
   }, [])
 
   useEffect(() => {
-    loadConversations()
+    const timer = setTimeout(() => { void loadConversations() }, 0)
+    return () => clearTimeout(timer)
   }, [loadConversations])
 
   const applyContactUpdate = useCallback((contactId: string, changes: Partial<Contact>) => {

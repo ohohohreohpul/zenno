@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { IS_MOCK, MockDB } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { CommentAutomation } from '@/models/CommentAutomation'
-import { serializeDoc } from '@/lib/serialize'
+import { updateCommentAutomation } from '@/lib/queries'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -24,14 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  if (IS_MOCK) {
-    const updated = MockDB.updateCommentAutomation(id, parsed.data)
-    if (!updated) return NextResponse.json({ error: 'Automation not found' }, { status: 404 })
-    return NextResponse.json({ data: updated })
-  }
-
-  await connectDb()
-  const updated = await CommentAutomation.findByIdAndUpdate(id, { $set: parsed.data }, { new: true }).lean()
+  const updated = await updateCommentAutomation(id, parsed.data)
   if (!updated) return NextResponse.json({ error: 'Automation not found' }, { status: 404 })
-  return NextResponse.json({ data: serializeDoc(updated) })
+  return NextResponse.json({ data: updated })
 }

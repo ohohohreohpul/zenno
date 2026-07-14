@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { IS_MOCK } from '@/lib/mock-store'
-import { connectDb } from '@/lib/db'
-import { User, type IUser } from '@/models/User'
+import { getUserByEmail } from '@/lib/queries'
 import {
   MOCK_DEMO_USER,
   SESSION_COOKIE,
@@ -26,14 +25,13 @@ async function authenticate(email: string, password: string): Promise<SessionPay
     return { userId: MOCK_DEMO_USER.userId, email: MOCK_DEMO_USER.email, name: MOCK_DEMO_USER.name }
   }
 
-  await connectDb()
-  const user = (await User.findOne({ email }).lean()) as IUser | null
+  const user = await getUserByEmail(email) as { id: string; email: string; passwordHash: string; name: string } | null
   if (!user) return null
 
   const isValid = await verifyPassword(password, user.passwordHash)
   if (!isValid) return null
 
-  return { userId: String(user._id), email: user.email, name: user.name }
+  return { userId: user.id, email: user.email, name: user.name }
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
