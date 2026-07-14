@@ -39,3 +39,34 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+@keyframes auth-enter {
+  from { opacity: 0; filter: blur(5px); transform: translateY(12px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+
+.auth-enter {
+  opacity: 0;
+  animation: auth-enter 700ms var(--ease-out-expo) forwards;
+}
+
+.auth-delay-1 { animation-delay: 60ms; }
+.auth-delay-2 { animation-delay: 120ms; }
+.auth-delay-3 { animation-delay: 180ms; }
+.auth-delay-4 { animation-delay: 240ms; }
+.auth-delay-5 { animation-delay: 300ms; }
+.auth-delay-6 { animation-delay: 360ms; }
+.auth-delay-7 { animation-delay: 420ms; }
+.auth-delay-8 { animation-delay: 480ms; }
+
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom right, black, transparent 72%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-enter { opacity: 1; animation: none; }
+}

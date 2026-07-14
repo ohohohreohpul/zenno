@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
@@ -128,16 +129,7 @@ export function Sidebar() {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <span
-          style={{
-            fontSize: 15,
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-            color: 'var(--text-primary)',
-          }}
-        >
-          {workspaceName || 'Your Agency'}
-        </span>
+        <Image src="/logo/logowithtext-2.svg" alt="Zenno" width={112} height={31} priority style={{ width: 94, height: 'auto' }} />
       </div>
 
       <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>

@@ -18,6 +18,10 @@ export async function sessionForSupabaseUser(user: User): Promise<SessionPayload
 
 export function withSessionCookie<T>(data: T, session: SessionPayload, status = 200): NextResponse {
   const response = NextResponse.json({ data }, { status })
+  return setSessionCookie(response, session)
+}
+
+export function setSessionCookie(response: NextResponse, session: SessionPayload): NextResponse {
   response.cookies.set(SESSION_COOKIE, createSessionToken(session), {
     httpOnly: true,
     sameSite: 'lax',
