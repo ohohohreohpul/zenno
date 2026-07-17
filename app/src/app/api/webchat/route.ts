@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleIncoming } from '@/lib/conversation'
 import { findChannelConnectionByEmbedKey, findContactByExternal, getMessages } from '@/lib/queries'
+import { normalizeWidgetSettings } from '@/lib/channels/webchat-widget'
 
 const MAX_TEXT_LENGTH = 2000
 const HISTORY_LIMIT = 50
@@ -34,6 +35,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const key = req.nextUrl.searchParams.get('key') ?? ''
   const visitor = req.nextUrl.searchParams.get('visitor') ?? ''
   const after = req.nextUrl.searchParams.get('after')
+
+  // Widget bootstrap: appearance settings by embed key, no visitor required.
+  if (key && req.nextUrl.searchParams.get('config') === '1') {
+    try {
+      const connection = await findChannelConnectionByEmbedKey(key) as { status?: string; credentials?: { widgetSettings?: unknown } } | null
+      if (connection?.status !== 'connected') return corsJson({ error: 'Unknown embed key' }, 401)
+      return corsJson({ data: normalizeWidgetSettings(connection.credentials?.widgetSettings) })
+    } catch (error) {
+      console.error('[webchat] config failed:', error)
+      return corsJson({ error: 'Something went wrong' }, 500)
+    }
+  }
+
   if (!key || !visitor) return corsJson({ error: 'key and visitor are required' }, 400)
   try {
     const workspaceId = await findWorkspaceByKey(key)
