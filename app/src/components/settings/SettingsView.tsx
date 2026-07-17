@@ -48,6 +48,7 @@ const MESSENGER_CONFIG: ChannelCardConfig = {
   ],
   helpText: 'After connecting, add the webhook URL + verify token shown here in the Meta app dashboard (messages subscription).',
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',
+  guideUrl: '/dashboard/guides/meta-connections',
   meta: 'messenger',
 }
 
@@ -63,6 +64,7 @@ const INSTAGRAM_CONFIG: ChannelCardConfig = {
   ],
   helpText: 'After connecting, add the webhook URL and verify token shown here to the Instagram webhook in Meta Developers.',
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/instagram/',
+  guideUrl: '/dashboard/guides/meta-connections',
   meta: 'instagram',
 }
 

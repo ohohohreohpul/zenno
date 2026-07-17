@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Check, Copy, Loader2, Unplug } from 'lucide-react'
 
 /**
@@ -26,6 +27,7 @@ export interface ChannelCardConfig {
   fields: ChannelFieldConfig[]
   helpText?: string
   docsUrl?: string
+  guideUrl?: string
   /** Set for Meta channels — enables the one-click Connect with Facebook flow. */
   meta?: 'messenger' | 'instagram'
 }
@@ -165,6 +167,9 @@ export function CredentialChannelCard({ config }: { config: ChannelCardConfig })
         {config.description}
         {config.docsUrl && (
           <> · <a href={config.docsUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>docs</a></>
+        )}
+        {config.guideUrl && (
+          <> · <Link href={config.guideUrl} style={{ color: 'var(--accent)', fontWeight: 600 }}>step-by-step setup guide</Link></>
         )}
       </div>
 
