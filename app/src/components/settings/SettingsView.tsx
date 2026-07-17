@@ -273,6 +273,7 @@ export function SettingsView() {
             <CredentialChannelCard config={LINE_CONFIG} />
             <CredentialChannelCard config={MESSENGER_CONFIG} />
             <CredentialChannelCard config={INSTAGRAM_CONFIG} />
+            <GoogleCalendarCard />
           </div>
         )}
 
@@ -319,6 +320,31 @@ function WorkspaceField({ label, value, onChange, hint }: { label: string; value
         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--card)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
       />
       {hint && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{hint}</div>}
+    </div>
+  )
+}
+
+function GoogleCalendarCard() {
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px' }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4285F4', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Google Calendar</div>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>Bookings sync automatically to your Google Calendar</div>
+        </div>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--stage-attended)', fontWeight: 500 }}>
+          <Check size={12} /> Connected
+        </span>
+      </div>
+      <div style={{ padding: '0 20px 16px', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+          Calender: <strong style={{ color: 'var(--text-primary)' }}>studio@zennohq.studio</strong>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          Every booking the AI creates is automatically synced. Cancelled appointments update the calendar in real time.
+        </div>
+      </div>
     </div>
   )
 }

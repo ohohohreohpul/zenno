@@ -55,8 +55,8 @@ export interface MockScheduleSlot {
   _id: ID
   workspaceId: ID
   className: string
-  dayOfWeek: number // 0 = Sunday … 6 = Saturday
-  time: string // '07:00'
+  dayOfWeek: number
+  time: string
   durationMin: number
   capacity: number
   booked: number
@@ -131,81 +131,78 @@ interface MockWorkspace {
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000)
 
+// ── Agency & Workspace ─────────────────────────────────────────────────────────
+
 export const mockAgencies: MockAgency[] = [
   {
     _id: 'agency-1',
-    name: 'Zen Studio Agency',
-    slug: 'zen-studio',
+    name: 'Zenno Studio',
+    slug: 'zenno-studio',
     ownerId: 'user-1',
     brandColor: '#1A1714',
-    credits: 450,
-    plan: 'starter',
-    createdAt: ago(10080),
+    credits: 850,
+    plan: 'pro',
+    createdAt: ago(20160),
   },
 ]
 
 export const mockWorkspaces: MockWorkspace[] = [
-  { _id: 'ws-1', name: 'Lotus Yoga Bangkok', slug: 'lotus-yoga', agencyId: 'agency-1', createdAt: ago(5040) },
-  { _id: 'ws-2', name: 'Serene Spa Sukhumvit', slug: 'serene-spa', agencyId: 'agency-1', createdAt: ago(2520) },
+  { _id: 'ws-1', name: 'Zenno Studio Berlin', slug: 'zenno-berlin', agencyId: 'agency-1', createdAt: ago(10080) },
 ]
+
+// ── 12 Contacts ───────────────────────────────────────────────────────────────
 
 export const mockContacts: MockContact[] = [
-  { _id: 'c-1', workspaceId: 'ws-1', externalId: '66812345678', channel: 'whatsapp', name: 'Mia Tanaka', phone: '+66812345678', lifecycleStage: 'inquiry', tags: ['yoga', 'trial'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 2, notes: '', memorySummary: 'First-time inquiry via Instagram. Interested in morning classes. Asked about 7am vs 9am. Considering a trial.', memoryUpdatedAt: ago(5), createdAt: ago(120), updatedAt: ago(5) },
-  { _id: 'c-2', workspaceId: 'ws-1', externalId: '66823456789', channel: 'whatsapp', name: 'Lena Hoffmann', phone: '+66823456789', lifecycleStage: 'qualified', tags: ['spa', 'vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: true, unread: 1, notes: 'Wants to start monthly unlimited this week — needs human confirmation for payment.', memorySummary: 'Returning interest in monthly unlimited (2,500 THB). Compared against 10-class pack. Wants to start this week. Payment needs human.', memoryUpdatedAt: ago(30), createdAt: ago(200), updatedAt: ago(30) },
-  { _id: 'c-3', workspaceId: 'ws-1', externalId: 'ig_sarahloves', channel: 'instagram', name: 'Sarah Chen', phone: null, lifecycleStage: 'trial_booked', tags: ['inquiry'], botActive: false, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: '', memorySummary: 'Booked a 9am trial class. Enthusiastic tone. Bot paused (human took over).', memoryUpdatedAt: ago(60), createdAt: ago(480), updatedAt: ago(60) },
-  { _id: 'c-4', workspaceId: 'ws-1', externalId: 'line_kk2024', channel: 'line', name: 'Koko Watanabe', phone: null, lifecycleStage: 'attended', tags: ['lead'], botActive: false, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Prefers Thai language.', memorySummary: 'Attended a class. Prefers Thai. Chat closed — re-engagement candidate.', memoryUpdatedAt: ago(240), createdAt: ago(1440), updatedAt: ago(240) },
-  { _id: 'c-5', workspaceId: 'ws-1', externalId: '66834567890', channel: 'whatsapp', name: 'Priya Nair', phone: '+66834567890', lifecycleStage: 'rebooked', tags: ['retreat'], botActive: true, dnd: true, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Attended March retreat. Early-bird for next one.', memorySummary: 'Past retreat attendee. Offered early-bird for next retreat (4,200 THB). On DND.', memoryUpdatedAt: ago(480), createdAt: ago(2880), updatedAt: ago(480) },
-  { _id: 'c-6', workspaceId: 'ws-2', externalId: '66845678901', channel: 'whatsapp', name: 'Emma Williams', phone: '+66845678901', lifecycleStage: 'vip', tags: ['vip'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: '', memorySummary: 'VIP customer. No open objections.', memoryUpdatedAt: null, createdAt: ago(4320), updatedAt: ago(720) },
+  // 1. Anna Müller — full sales cycle, WhatsApp, German, trial_booked
+  { _id: 'c-1', workspaceId: 'ws-1', externalId: '491701234567', channel: 'whatsapp', name: 'Anna Müller', phone: '+491701234567', lifecycleStage: 'trial_booked', tags: ['yoga', 'trial', 'neukunde'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: '', memorySummary: 'Neukunde via Instagram. Interessiert an Morning Flow. Hat zuerst Preis als zu teuer empfunden, nach Reframing Probestunde gebucht. Deal: 10er-Karte erstellt.', memoryUpdatedAt: ago(8), createdAt: ago(320), updatedAt: ago(8) },
+
+  // 2. Stefan Weber — English, qualified, massage interest
+  { _id: 'c-2', workspaceId: 'ws-1', externalId: '491709876543', channel: 'whatsapp', name: 'Stefan Weber', phone: '+491709876543', lifecycleStage: 'qualified', tags: ['massage', 'consultation'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: '', memorySummary: 'International client, English speaker. Interested in deep tissue massage. Offered a consultation. Deal: Massage package created.', memoryUpdatedAt: ago(25), createdAt: ago(180), updatedAt: ago(25) },
+
+  // 3. Clara Schmidt — German, attended, returning customer with memory
+  { _id: 'c-3', workspaceId: 'ws-1', externalId: '491512345678', channel: 'whatsapp', name: 'Clara Schmidt', phone: '+491512345678', lifecycleStage: 'attended', tags: ['yoga', 'vip', 'returning'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: 'Stammkunde seit 6 Monaten. Bevorzugt Yin Yoga bei Mara.', memorySummary: 'Stammkunde seit 6 Monaten. Liebt Yin Yoga bei Mara. Hat schon 2 Retreats besucht. Bietet Jahrestarif an.', memoryUpdatedAt: ago(60), createdAt: ago(720), updatedAt: ago(60) },
+
+  // 4. Marco Bianchi — English, Messenger, inquiry
+  { _id: 'c-4', workspaceId: 'ws-1', externalId: 'm_marco_b', channel: 'messenger', name: 'Marco Bianchi', phone: null, lifecycleStage: 'inquiry', tags: ['facial', 'new'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 2, notes: '', memorySummary: 'New inquiry via Messenger. Interested in facial treatments. AI is qualifying.', memoryUpdatedAt: ago(12), createdAt: ago(45), updatedAt: ago(12) },
+
+  // 5. Lena Fischer — German, WhatsApp, negotiation (comparing with competitor)
+  { _id: 'c-5', workspaceId: 'ws-1', externalId: '491611223344', channel: 'whatsapp', name: 'Lena Fischer', phone: '+491611223344', lifecycleStage: 'negotiation', tags: ['membership', 'objection'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 1, notes: 'Vergleicht mit Konkurrent in Mitte. Hat 15% Rabatt gefordert.', memorySummary: 'Vergleicht mit Studio in Mitte (Monatstarif 159€). Hat 15% Rabatt gefordert. AI erklärt den Mehrwert. Deal in Verhandlung.', memoryUpdatedAt: ago(18), createdAt: ago(160), updatedAt: ago(18) },
+
+  // 6. Yuki Tanaka — English, WhatsApp, VIP, deal WON
+  { _id: 'c-6', workspaceId: 'ws-1', externalId: '491762345678', channel: 'whatsapp', name: 'Yuki Tanaka', phone: '+491762345678', lifecycleStage: 'vip', tags: ['vip', 'spa', 'premium'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: 'VIP Kunde. Nimmt Premium-Pakete. Kommt alle 2 Wochen.', memorySummary: 'VIP-Kunde seit 8 Monaten. Bucht Premium Spa Package alle 2 Wochen. Bevorzugt Lukas als Therapeuten. Deal geschlossen: Premium Spa Package 450€.', memoryUpdatedAt: ago(120), createdAt: ago(2880), updatedAt: ago(120) },
+
+  // 7. Hannah Wagner — German, Instagram, inquiry → went quiet (stalled, for one-click optimize demo)
+  { _id: 'c-7', workspaceId: 'ws-1', externalId: 'ig_hannah_w', channel: 'instagram', name: 'Hannah Wagner', phone: null, lifecycleStage: 'inquiry', tags: ['yoga', 'stalled'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: 'Hat vor 48h angefragt, nicht geantwortet.', memorySummary: 'Erste Anfrage vor 48h. Keine Antwort seitdem. Re-Engagement nötig.', memoryUpdatedAt: ago(2880), createdAt: ago(2900), updatedAt: ago(2880) },
+
+  // 8. Tom Becker — German, WhatsApp, qualified but stalled 48h
+  { _id: 'c-8', workspaceId: 'ws-1', externalId: '491774455667', channel: 'whatsapp', name: 'Tom Becker', phone: '+491774455667', lifecycleStage: 'qualified', tags: ['massage', 'stalled'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: 'Qualifiziert, aber 48h keine Antwort.', memorySummary: 'Interessiert an Massage. Qualifiziert vor 2 Tagen. Seitdem keine Antwort. Follow-up nötig.', memoryUpdatedAt: ago(2880), createdAt: ago(600), updatedAt: ago(2880) },
+
+  // 9. Sophie Klein — German, Messenger, complaint → escalated (attention required)
+  { _id: 'c-9', workspaceId: 'ws-1', externalId: 'm_sophie_k', channel: 'messenger', name: 'Sophie Klein', phone: null, lifecycleStage: 'qualified', tags: ['complaint', 'escalated'], botActive: false, dnd: false, chatStatus: 'open', attentionRequired: true, unread: 3, notes: 'Beschwerde über Massage-Behandlung. AI hat an Mensch eskaliert.', memorySummary: 'Beschwerde: Massage war zu kurz. AI hat sofort an Team eskaliert. Bot pausiert — Mensch übernimmt.', memoryUpdatedAt: ago(20), createdAt: ago(200), updatedAt: ago(20) },
+
+  // 10. David Chen — English, WhatsApp, trial_booked for tomorrow
+  { _id: 'c-10', workspaceId: 'ws-1', externalId: '491761122334', channel: 'whatsapp', name: 'David Chen', phone: '+491761122334', lifecycleStage: 'trial_booked', tags: ['facial', 'trial'], botActive: true, dnd: false, chatStatus: 'open', attentionRequired: false, unread: 0, notes: '', memorySummary: 'Booked facial trial for tomorrow 10am. Confirmed via WhatsApp.', memoryUpdatedAt: ago(35), createdAt: ago(90), updatedAt: ago(35) },
+
+  // 11. Nadia Petrov — German, WhatsApp, rebooked (campaign re-engaged her)
+  { _id: 'c-11', workspaceId: 'ws-1', externalId: '491512987654', channel: 'whatsapp', name: 'Nadia Petrov', phone: '+491512987654', lifecycleStage: 'rebooked', tags: ['yoga', 'returning', 'campaign'], botActive: true, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: 'Wiedergewonnen durch Re-Engagement Kampagne.', memorySummary: 'Altkunde, war 3 Monate inaktiv. Re-Engagement Kampagne hat sie zurückgeholt. Bucht wieder Morning Flow.', memoryUpdatedAt: ago(180), createdAt: ago(4320), updatedAt: ago(180) },
+
+  // 12. Felix Roth — German, Instagram, reviewed (happy customer, 5 stars, chat closed)
+  { _id: 'c-12', workspaceId: 'ws-1', externalId: 'ig_felix_r', channel: 'instagram', name: 'Felix Roth', phone: null, lifecycleStage: 'reviewed', tags: ['review', 'satisfied'], botActive: true, dnd: false, chatStatus: 'closed', attentionRequired: false, unread: 0, notes: '5-Sterne Google Review hinterlassen.', memorySummary: 'Zufriedener Kunde. Hat 5-Sterne Google Review hinterlassen. AI hat sich bedankt. Chat geschlossen.', memoryUpdatedAt: ago(500), createdAt: ago(1500), updatedAt: ago(500) },
 ]
+
+// ── 7 Deals ───────────────────────────────────────────────────────────────────
 
 export const mockDeals: MockDeal[] = [
-  { _id: 'd-1', workspaceId: 'ws-1', contactId: 'c-1', name: 'Yoga Package 10x', contactName: 'Mia Tanaka', value: 4500, currency: 'THB', stage: 'lead', channel: 'whatsapp', createdAt: ago(100), updatedAt: ago(100) },
-  { _id: 'd-2', workspaceId: 'ws-1', contactId: null, name: 'Monthly Membership', contactName: 'Sara Bloom', value: 2900, currency: 'THB', stage: 'lead', channel: 'instagram', createdAt: ago(300), updatedAt: ago(300) },
-  { _id: 'd-3', workspaceId: 'ws-1', contactId: 'c-2', name: 'Private Coaching', contactName: 'Lena Hoffmann', value: 18000, currency: 'THB', stage: 'lead', channel: 'whatsapp', createdAt: ago(400), updatedAt: ago(400) },
-  { _id: 'd-4', workspaceId: 'ws-1', contactId: null, name: 'Drop-in Pass x5', contactName: 'James Wu', value: 1500, currency: 'THB', stage: 'lead', channel: 'instagram', createdAt: ago(500), updatedAt: ago(500) },
-  { _id: 'd-5', workspaceId: 'ws-1', contactId: 'c-3', name: 'Annual Plan', contactName: 'Sarah Chen', value: 28800, currency: 'THB', stage: 'qualified', channel: 'whatsapp', createdAt: ago(600), updatedAt: ago(600) },
-  { _id: 'd-6', workspaceId: 'ws-1', contactId: null, name: 'Corporate Wellness', contactName: 'Tom Reeves', value: 45000, currency: 'THB', stage: 'qualified', channel: 'whatsapp', createdAt: ago(700), updatedAt: ago(700) },
-  { _id: 'd-7', workspaceId: 'ws-1', contactId: null, name: 'Retreat Package', contactName: 'Nadia Park', value: 12000, currency: 'THB', stage: 'qualified', channel: 'instagram', createdAt: ago(800), updatedAt: ago(800) },
+  { _id: 'd-1', workspaceId: 'ws-1', contactId: 'c-1', name: '10er-Karte Yoga', contactName: 'Anna Müller', value: 380, currency: 'EUR', stage: 'negotiation', channel: 'whatsapp', createdAt: ago(280), updatedAt: ago(8) },
+  { _id: 'd-2', workspaceId: 'ws-1', contactId: 'c-5', name: 'Monatstarif', contactName: 'Lena Fischer', value: 199, currency: 'EUR', stage: 'negotiation', channel: 'whatsapp', createdAt: ago(140), updatedAt: ago(18) },
+  { _id: 'd-3', workspaceId: 'ws-1', contactId: 'c-6', name: 'Premium Spa Package', contactName: 'Yuki Tanaka', value: 450, currency: 'EUR', stage: 'won', channel: 'whatsapp', createdAt: ago(2800), updatedAt: ago(120) },
+  { _id: 'd-4', workspaceId: 'ws-1', contactId: 'c-3', name: 'Jahrestarif', contactName: 'Clara Schmidt', value: 1990, currency: 'EUR', stage: 'proposal', channel: 'whatsapp', createdAt: ago(500), updatedAt: ago(60) },
+  { _id: 'd-5', workspaceId: 'ws-1', contactId: 'c-4', name: 'Facial Treatment', contactName: 'Marco Bianchi', value: 120, currency: 'EUR', stage: 'lead', channel: 'messenger', createdAt: ago(40), updatedAt: ago(12) },
+  { _id: 'd-6', workspaceId: 'ws-1', contactId: 'c-2', name: 'Massage Package 6x', contactName: 'Stefan Weber', value: 360, currency: 'EUR', stage: 'qualified', channel: 'whatsapp', createdAt: ago(150), updatedAt: ago(25) },
+  { _id: 'd-7', workspaceId: 'ws-1', contactId: 'c-7', name: 'Monatstarif', contactName: 'Hannah Wagner', value: 199, currency: 'EUR', stage: 'lost', channel: 'instagram', createdAt: ago(2800), updatedAt: ago(2880) },
 ]
 
-export const mockTasks: MockTask[] = [
-  { _id: 't-1', workspaceId: 'ws-1', contactId: 'c-2', title: 'Confirm monthly membership payment', contactName: 'Lena Hoffmann', priority: 'high', status: 'todo', dueDate: ago(-1440), createdAt: ago(30), updatedAt: ago(30) },
-  { _id: 't-2', workspaceId: 'ws-1', contactId: 'c-3', title: 'Prepare trial class welcome pack', contactName: 'Sarah Chen', priority: 'medium', status: 'todo', dueDate: ago(-2880), createdAt: ago(60), updatedAt: ago(60) },
-  { _id: 't-3', workspaceId: 'ws-1', contactId: 'c-1', title: 'Follow up on morning flow question', contactName: 'Mia Tanaka', priority: 'low', status: 'in_progress', dueDate: ago(-720), createdAt: ago(120), updatedAt: ago(15) },
-  { _id: 't-4', workspaceId: 'ws-1', contactId: 'c-5', title: 'Send retreat early-bird offer', contactName: 'Priya Nair', priority: 'medium', status: 'in_progress', dueDate: ago(-4320), createdAt: ago(480), updatedAt: ago(200) },
-]
-
-export const mockMessages: MockMessage[] = [
-  // c-1 Mia
-  { _id: 'm-1', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'inbound', content: 'Hi! I saw your yoga studio on Instagram. What classes do you have?', aiGenerated: false, createdAt: ago(125) },
-  { _id: 'm-2', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'outbound', content: "Hi Mia! Welcome to Lotus Yoga. We have morning flows, evening yin, and weekend workshops. Would you like to book a free trial class?", aiGenerated: true, createdAt: ago(124) },
-  { _id: 'm-3', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'inbound', content: 'That sounds amazing! What time is the morning flow?', aiGenerated: false, createdAt: ago(10) },
-  { _id: 'm-4', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'outbound', content: 'Morning flow is at 7am and 9am daily. The 7am slot is usually quieter if you prefer a more intimate setting!', aiGenerated: true, createdAt: ago(5) },
-  // c-2 Lena
-  { _id: 'm-5', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'inbound', content: 'Do you offer monthly memberships?', aiGenerated: false, createdAt: ago(205) },
-  { _id: 'm-6', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'outbound', content: 'Yes! Our monthly unlimited is 2,500 THB. We also have a 10-class pack at 1,800 THB. Which suits you better?', aiGenerated: true, createdAt: ago(204) },
-  { _id: 'm-7', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'inbound', content: 'The monthly unlimited sounds good. Can I start this week?', aiGenerated: false, createdAt: ago(35) },
-  // c-3 Sarah
-  { _id: 'm-8', workspaceId: 'ws-1', contactId: 'c-3', channel: 'instagram', direction: 'inbound', content: 'Your studio looks so peaceful ✨ I want to join!', aiGenerated: false, createdAt: ago(485) },
-  { _id: 'm-9', workspaceId: 'ws-1', contactId: 'c-3', channel: 'instagram', direction: 'outbound', content: "Thank you Sarah! We'd love to have you. I've reserved a spot for you in tomorrow's 9am trial class. Shall I confirm?", aiGenerated: true, createdAt: ago(483) },
-  { _id: 'm-10', workspaceId: 'ws-1', contactId: 'c-3', channel: 'instagram', direction: 'inbound', content: 'Yes please! See you tomorrow 🙏', aiGenerated: false, createdAt: ago(65) },
-  // c-4 Koko
-  { _id: 'm-11', workspaceId: 'ws-1', contactId: 'c-4', channel: 'line', direction: 'inbound', content: 'สวัสดีค่ะ อยากถามเรื่องคลาสโยคะค่ะ', aiGenerated: false, createdAt: ago(1450) },
-  { _id: 'm-12', workspaceId: 'ws-1', contactId: 'c-4', channel: 'line', direction: 'outbound', content: 'สวัสดีค่ะ Koko! ยินดีต้อนรับสู่ Lotus Yoga นะคะ มีคลาสหลากหลายให้เลือกเลยค่ะ', aiGenerated: true, createdAt: ago(1448) },
-  // c-5 Priya
-  { _id: 'm-13', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'inbound', content: 'I loved the retreat last month! When is the next one?', aiGenerated: false, createdAt: ago(490) },
-  { _id: 'm-14', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'outbound', content: "So happy you loved it Priya! Our next weekend retreat is March 15-16. As a returning guest you get early bird pricing — just 4,200 THB!", aiGenerated: true, createdAt: ago(488) },
-]
-
-export const mockSchedule: MockScheduleSlot[] = [
-  { _id: 's-1', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 1, time: '07:00', durationMin: 60, capacity: 14, booked: 9, instructor: 'Nok' },
-  { _id: 's-2', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 1, time: '09:00', durationMin: 60, capacity: 14, booked: 13, instructor: 'Nok' },
-  { _id: 's-3', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 3, time: '07:00', durationMin: 60, capacity: 14, booked: 6, instructor: 'Ploy' },
-  { _id: 's-4', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 5, time: '09:00', durationMin: 60, capacity: 14, booked: 8, instructor: 'Nok' },
-  { _id: 's-5', workspaceId: 'ws-1', className: 'Evening Yin', dayOfWeek: 2, time: '18:30', durationMin: 75, capacity: 12, booked: 10, instructor: 'Ploy' },
-  { _id: 's-6', workspaceId: 'ws-1', className: 'Evening Yin', dayOfWeek: 4, time: '18:30', durationMin: 75, capacity: 12, booked: 5, instructor: 'Mali' },
-  { _id: 's-7', workspaceId: 'ws-1', className: 'Weekend Workshop', dayOfWeek: 6, time: '10:00', durationMin: 120, capacity: 20, booked: 12, instructor: 'Mali' },
-]
+// ── 4 Tasks ───────────────────────────────────────────────────────────────────
 
 const upcoming = (daysAhead: number, hour: number, minute = 0) => {
   const d = new Date()
@@ -214,42 +211,141 @@ const upcoming = (daysAhead: number, hour: number, minute = 0) => {
   return d
 }
 
-export const mockAppointments: MockAppointment[] = [
-  { _id: 'a-1', workspaceId: 'ws-1', contactId: 'c-3', contactName: 'Sarah Chen', className: 'Morning Flow (Trial)', startsAt: upcoming(1, 9), durationMin: 60, channel: 'instagram', kind: 'trial', createdAt: ago(480) },
-  { _id: 'a-2', workspaceId: 'ws-1', contactId: 'c-2', contactName: 'Lena Hoffmann', className: 'Membership Consult', startsAt: upcoming(2, 14, 30), durationMin: 30, channel: 'whatsapp', kind: 'consult', createdAt: ago(200) },
+export const mockTasks: MockTask[] = [
+  { _id: 't-1', workspaceId: 'ws-1', contactId: 'c-7', title: 'Follow-up an Hannah Wagner (keine Antwort seit 48h)', contactName: 'Hannah Wagner', priority: 'high', status: 'todo', dueDate: upcoming(0, 17), createdAt: ago(120), updatedAt: ago(120) },
+  { _id: 't-2', workspaceId: 'ws-1', contactId: 'c-9', title: 'Beschwerde von Sophie Klein klären', contactName: 'Sophie Klein', priority: 'high', status: 'todo', dueDate: upcoming(0, 12), createdAt: ago(20), updatedAt: ago(20) },
+  { _id: 't-3', workspaceId: 'ws-1', contactId: 'c-6', title: 'Premium Spa Package für Yuki vorbereiten', contactName: 'Yuki Tanaka', priority: 'medium', status: 'in_progress', dueDate: upcoming(1, 15), createdAt: ago(60), updatedAt: ago(30) },
+  { _id: 't-4', workspaceId: 'ws-1', contactId: 'c-12', title: 'Retreat-Info an Felix schicken', contactName: 'Felix Roth', priority: 'low', status: 'in_progress', dueDate: upcoming(3, 10), createdAt: ago(500), updatedAt: ago(400) },
 ]
+
+// ── Messages (12 conversations, ~45 messages) ────────────────────────────────
+
+export const mockMessages: MockMessage[] = [
+  // c-1 Anna Müller — full sales cycle (6 messages, German)
+  { _id: 'm-1', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'inbound', content: 'Hallo! Ich habe euer Studio auf Instagram gesehen. Welche Kurse habt ihr?', aiGenerated: false, createdAt: ago(310) },
+  { _id: 'm-2', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'outbound', content: 'Hallo Anna! Willkommen bei Zenno Studio. Wir bieten Morning Flow, Yin Yoga, Massagen und Gesichtsbehandlungen. Wärst du an einer kostenlosen Probestunde interessiert?', aiGenerated: true, createdAt: ago(305) },
+  { _id: 'm-3', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'inbound', content: 'Klingt gut! Was kostet eine Mitgliedschaft?', aiGenerated: false, createdAt: ago(300) },
+  { _id: 'm-4', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'outbound', content: 'Unser Monatstarif ist 199€ — das sind etwa 6,60€ pro Tag für unbegrenzte Kurse. Wir legen Wert auf persönliche Betreuung und kleine Gruppen (max. 14 Teilnehmer). Möchtest du eine Probestunde buchen?', aiGenerated: true, createdAt: ago(298) },
+  { _id: 'm-5', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'inbound', content: 'Ehrlich gesagt ist mir das zu teuer...', aiGenerated: false, createdAt: ago(20) },
+  { _id: 'm-6', workspaceId: 'ws-1', contactId: 'c-1', channel: 'whatsapp', direction: 'outbound', content: 'Ich verstehe das völlig, Anna. Die Probestunde ist komplett kostenlos — so kannst du erstmal sehen, ob es dir gefällt. Morgen um 9 Uhr hätten wir noch 5 Plätze frei. Soll ich dir einen reservieren?', aiGenerated: true, createdAt: ago(8) },
+
+  // c-2 Stefan Weber — English, qualified (4 messages)
+  { _id: 'm-7', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'inbound', content: 'Hi, do you offer deep tissue massage?', aiGenerated: false, createdAt: ago(175) },
+  { _id: 'm-8', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'outbound', content: 'Hi Stefan! Yes, we offer deep tissue and sports massage with our therapist Niklas. Sessions are 60 or 90 minutes. Are you looking for a single session or a package?', aiGenerated: true, createdAt: ago(170) },
+  { _id: 'm-9', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'inbound', content: 'A package would be great. What are the options?', aiGenerated: false, createdAt: ago(28) },
+  { _id: 'm-10', workspaceId: 'ws-1', contactId: 'c-2', channel: 'whatsapp', direction: 'outbound', content: 'We have a 6-session package at €360 (save €60 vs single sessions). Would you like to book a consultation first so Niklas can assess your needs? I have a slot Thursday at 2pm.', aiGenerated: true, createdAt: ago(25) },
+
+  // c-3 Clara Schmidt — returning customer with memory (4 messages, German)
+  { _id: 'm-11', workspaceId: 'ws-1', contactId: 'c-3', channel: 'whatsapp', direction: 'inbound', content: 'Hallo! Ich würde gerne wieder zu Yin Yoga kommen. Mara gibt die besten Stunden!', aiGenerated: false, createdAt: ago(70) },
+  { _id: 'm-12', workspaceId: 'ws-1', contactId: 'c-3', channel: 'whatsapp', direction: 'outbound', content: 'Hallo Clara! Schön von dir zu hören. Mara unterrichtet dienstags und donnerstags um 18:30 Uhr. Da du schon seit 6 Monaten dabei bist und zwei Retreats besucht hast — möchtest du vom Monatstarif auf unseren Jahrestarif wechseln? Du sparst damit 28%.', aiGenerated: true, createdAt: ago(68) },
+  { _id: 'm-13', workspaceId: 'ws-1', contactId: 'c-3', channel: 'whatsapp', direction: 'inbound', content: 'Oh, das ist interessant! Kannst du mir mehr dazu sagen?', aiGenerated: false, createdAt: ago(65) },
+  { _id: 'm-14', workspaceId: 'ws-1', contactId: 'c-3', channel: 'whatsapp', direction: 'outbound', content: 'Der Jahrestarif ist 1.990€ — das sind 166€/Monat statt 199€. Du sparst über 400€ im Jahr und hast unbegrenzten Zugang zu allen Kursen, Workshops und 10% Rabatt auf Massagen. Soll ich dir ein Angebot schicken?', aiGenerated: true, createdAt: ago(60) },
+
+  // c-4 Marco Bianchi — English, Messenger, inquiry (2 messages)
+  { _id: 'm-15', workspaceId: 'ws-1', contactId: 'c-4', channel: 'messenger', direction: 'inbound', content: 'Hi! I saw your facial treatment post. Can you tell me more about it?', aiGenerated: false, createdAt: ago(40) },
+  { _id: 'm-16', workspaceId: 'ws-1', contactId: 'c-4', channel: 'messenger', direction: 'outbound', content: 'Hi Marco! Happy to help. We offer three facial treatments: Signature Glow (60 min, €120), Deep Hydration (75 min, €150), and our Premium Anti-Age (90 min, €190). What skin concerns are you looking to address?', aiGenerated: true, createdAt: ago(12) },
+
+  // c-5 Lena Fischer — negotiation, comparing with competitor (4 messages, German)
+  { _id: 'm-17', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'inbound', content: 'Hallo! Ich überlege, Mitglied zu werden. Ein anderes Studio in Mitte verlangt aber nur 159€ im Monat.', aiGenerated: false, createdAt: ago(155) },
+  { _id: 'm-18', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'outbound', content: 'Hallo Lena! Danke, dass du fragst. Unsere 199€ beinhalten unbegrenzte Kurse UND Massagen, während die meisten Studios nur Kurse anbieten. Außerdem haben wir max. 14 Teilnehmer pro Klasse — da kennst du deinen Trainer wirklich. Möchtest du eine Probestunde, um den Unterschied zu spüren?', aiGenerated: true, createdAt: ago(150) },
+  { _id: 'm-19', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'inbound', content: 'Hmm, aber 40€ mehr im Monat sind schon viel. Könnt ihr einen Rabatt geben?', aiGenerated: false, createdAt: ago(22) },
+  { _id: 'm-20', workspaceId: 'ws-1', contactId: 'c-5', channel: 'whatsapp', direction: 'outbound', content: 'Ich kann dir unseren 10er-Karte anbieten — 380€ für 10 Kurse, flexibel einlösbar. Du hast also keine monatliche Bindung und zahlst nur, was du nutzt. Oder ich buche dir eine kostenlose Probestunde, damit du uns erstmal ausprobierst?', aiGenerated: true, createdAt: ago(18) },
+
+  // c-6 Yuki Tanaka — VIP, deal won (4 messages, English)
+  { _id: 'm-21', workspaceId: 'ws-1', contactId: 'c-6', channel: 'whatsapp', direction: 'inbound', content: 'Hi, I\'d like to book my usual premium spa package again.', aiGenerated: false, createdAt: ago(180) },
+  { _id: 'm-22', workspaceId: 'ws-1', contactId: 'c-6', channel: 'whatsapp', direction: 'outbound', content: 'Hi Yuki! Of course — your Premium Spa Package with Lukas. I have Wednesday at 4pm available, same as your usual slot. Shall I book it?', aiGenerated: true, createdAt: ago(178) },
+  { _id: 'm-23', workspaceId: 'ws-1', contactId: 'c-6', channel: 'whatsapp', direction: 'inbound', content: 'Perfect. Book it please.', aiGenerated: false, createdAt: ago(175) },
+  { _id: 'm-24', workspaceId: 'ws-1', contactId: 'c-6', channel: 'whatsapp', direction: 'outbound', content: 'Booked for Wednesday at 4pm with Lukas. I\'ve sent a calendar invite to your email. See you then! ✨', aiGenerated: true, createdAt: ago(120) },
+
+  // c-7 Hannah Wagner — stalled, only 1 message (inquiry, no reply 48h)
+  { _id: 'm-25', workspaceId: 'ws-1', contactId: 'c-7', channel: 'instagram', direction: 'inbound', content: 'Hallo! Euer Studio sieht toll aus. Habt ihr noch Plätze für diese Woche frei?', aiGenerated: false, createdAt: ago(2885) },
+  { _id: 'm-26', workspaceId: 'ws-1', contactId: 'c-7', channel: 'instagram', direction: 'outbound', content: 'Hallo Hannah! Danke für dein Interesse. Ja, wir haben diese Woche noch Plätze frei. Wann würdest du gern kommen — morgens oder abends?', aiGenerated: true, createdAt: ago(2880) },
+
+  // c-8 Tom Becker — qualified, stalled 48h (3 messages then silence)
+  { _id: 'm-27', workspaceId: 'ws-1', contactId: 'c-8', channel: 'whatsapp', direction: 'inbound', content: 'Hallo, ich interessiere mich für eine Massage. Was habt ihr im Angebot?', aiGenerated: false, createdAt: ago(610) },
+  { _id: 'm-28', workspaceId: 'ws-1', contactId: 'c-8', channel: 'whatsapp', direction: 'outbound', content: 'Hallo Tom! Wir bieten klassische, Tiefengewebe- und Hot-Stone-Massagen an. Niklas und Mara sind unsere Therapeuten. Möchtest du eine Sitzung buchen oder erstmal beraten lassen?', aiGenerated: true, createdAt: ago(605) },
+  { _id: 'm-29', workspaceId: 'ws-1', contactId: 'c-8', channel: 'whatsapp', direction: 'inbound', content: 'Tiefengewebe klingt gut. Was kostet das?', aiGenerated: false, createdAt: ago(590) },
+  { _id: 'm-30', workspaceId: 'ws-1', contactId: 'c-8', channel: 'whatsapp', direction: 'outbound', content: 'Tiefengewebe-Massage: 60 Min für 89€ oder 90 Min für 129€. Ich kann dir einen Termin nächste Woche anbieten — Di oder Do um 16 Uhr. Passt das?', aiGenerated: true, createdAt: ago(2880) },
+
+  // c-9 Sophie Klein — complaint escalation (3 messages, German)
+  { _id: 'm-31', workspaceId: 'ws-1', contactId: 'c-9', channel: 'messenger', direction: 'inbound', content: 'Hallo, ich war gestern für eine Massage da und bin sehr unzufrieden. Die Behandlung war viel zu kurz und der Therapeut kam 15 Minuten zu spät.', aiGenerated: false, createdAt: ago(25) },
+  { _id: 'm-32', workspaceId: 'ws-1', contactId: 'c-9', channel: 'messenger', direction: 'outbound', content: 'Es tut mir sehr leid, das zu hören, Sophie. Das entspricht nicht unserem Anspruch. Ich leite das sofort an unser Team weiter — jemand wird sich heute noch persönlich bei dir melden, um das in Ordnung zu bringen.', aiGenerated: true, createdAt: ago(22) },
+  { _id: 'm-33', workspaceId: 'ws-1', contactId: 'c-9', channel: 'messenger', direction: 'inbound', content: 'Okay, danke. Ich erwarte eine Rückmeldung heute.', aiGenerated: false, createdAt: ago(20) },
+
+  // c-10 David Chen — trial booked, confirmation (3 messages, English)
+  { _id: 'm-34', workspaceId: 'ws-1', contactId: 'c-10', channel: 'whatsapp', direction: 'inbound', content: 'Hi! Are you offering facial trial sessions? I saw your story about the new treatments.', aiGenerated: false, createdAt: ago(85) },
+  { _id: 'm-35', workspaceId: 'ws-1', contactId: 'c-10', channel: 'whatsapp', direction: 'outbound', content: 'Hi David! Yes — your first facial session is on us. We offer the Signature Glow trial (45 min) so you can experience the treatment. I have tomorrow at 10am available. Shall I book it?', aiGenerated: true, createdAt: ago(80) },
+  { _id: 'm-36', workspaceId: 'ws-1', contactId: 'c-10', channel: 'whatsapp', direction: 'outbound', content: 'Booked for tomorrow (Saturday) at 10am with our aesthetician Mara. I\'ve sent the confirmation and address to your email. See you at the studio! 🌿', aiGenerated: true, createdAt: ago(35) },
+
+  // c-11 Nadia Petrov — re-engaged by campaign (3 messages, German)
+  { _id: 'm-37', workspaceId: 'ws-1', contactId: 'c-11', channel: 'whatsapp', direction: 'outbound', content: 'Hallo Nadia! Wir vermissen dich bei Zenno Studio. Du warst vor 3 Monaten bei uns — wir haben neue Morning Flow Zeiten und einen Frühbucher-Rabatt für dich. Möchtest du wieder vorbeikommen?', aiGenerated: false, createdAt: ago(200) },
+  { _id: 'm-38', workspaceId: 'ws-1', contactId: 'c-11', channel: 'whatsapp', direction: 'inbound', content: 'Hallo! Ja, ich würde gerne wieder kommen. Wann habt ihr Plätze frei?', aiGenerated: false, createdAt: ago(185) },
+  { _id: 'm-39', workspaceId: 'ws-1', contactId: 'c-11', channel: 'whatsapp', direction: 'outbound', content: 'Schön, dass du zurück bist, Nadia! Morgen um 7 Uhr hätten wir 4 Plätze frei im Morning Flow mit Niklas. Als Willkommen-zurück bekommst du die erste Woche gratis. Soll ich dich einbuchen?', aiGenerated: true, createdAt: ago(180) },
+
+  // c-12 Felix Roth — reviewed, happy customer (3 messages, German)
+  { _id: 'm-40', workspaceId: 'ws-1', contactId: 'c-12', channel: 'instagram', direction: 'inbound', content: 'Hallo! Ich habe gerade eine 5-Sterne-Bewertung auf Google hinterlassen. Wollte mich einfach bedanken für die tollen Stunden!', aiGenerated: false, createdAt: ago(520) },
+  { _id: 'm-41', workspaceId: 'ws-1', contactId: 'c-12', channel: 'instagram', direction: 'outbound', content: 'Felix, das bedeutet uns unglaublich viel! Danke für die Bewertung und für dein Vertrauen. Falls du beim nächsten Retreat im Herbst dabei sein möchtest, kann ich dir die Early-Bird-Info schicken. Brauchst du sonst noch etwas?', aiGenerated: true, createdAt: ago(500) },
+  { _id: 'm-42', workspaceId: 'ws-1', contactId: 'c-12', channel: 'instagram', direction: 'inbound', content: 'Ja gerne, schick mir die Infos zum Retreat! Danke für alles.', aiGenerated: false, createdAt: ago(490) },
+  { _id: 'm-43', workspaceId: 'ws-1', contactId: 'c-12', channel: 'instagram', direction: 'outbound', content: 'Macht es! Ich lege die Retreat-Infos für dich bereit und markiere diesen Chat als erledigt. Bis bald, Felix! 🙏', aiGenerated: true, createdAt: ago(485) },
+]
+
+// ── Schedule Slots (7 weekly, German instructors) ─────────────────────────────
+
+export const mockSchedule: MockScheduleSlot[] = [
+  { _id: 's-1', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 1, time: '07:00', durationMin: 60, capacity: 14, booked: 9, instructor: 'Niklas' },
+  { _id: 's-2', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 1, time: '09:00', durationMin: 60, capacity: 14, booked: 13, instructor: 'Niklas' },
+  { _id: 's-3', workspaceId: 'ws-1', className: 'Morning Flow', dayOfWeek: 3, time: '07:00', durationMin: 60, capacity: 14, booked: 6, instructor: 'Mara' },
+  { _id: 's-4', workspaceId: 'ws-1', className: 'Yin Yoga', dayOfWeek: 2, time: '18:30', durationMin: 75, capacity: 12, booked: 10, instructor: 'Mara' },
+  { _id: 's-5', workspaceId: 'ws-1', className: 'Yin Yoga', dayOfWeek: 4, time: '18:30', durationMin: 75, capacity: 12, booked: 5, instructor: 'Lukas' },
+  { _id: 's-6', workspaceId: 'ws-1', className: 'Weekend Workshop', dayOfWeek: 6, time: '10:00', durationMin: 120, capacity: 20, booked: 12, instructor: 'Mara' },
+  { _id: 's-7', workspaceId: 'ws-1', className: 'Tiefengewebe-Massage', dayOfWeek: 5, time: '14:00', durationMin: 90, capacity: 4, booked: 2, instructor: 'Niklas' },
+]
+
+// ── 5 Appointments (showing Google Calendar sync) ────────────────────────────
+
+export const mockAppointments: MockAppointment[] = [
+  { _id: 'a-1', workspaceId: 'ws-1', contactId: 'c-1', contactName: 'Anna Müller', className: 'Morning Flow (Probestunde)', startsAt: upcoming(1, 9), durationMin: 60, channel: 'whatsapp', kind: 'trial', createdAt: ago(8) },
+  { _id: 'a-2', workspaceId: 'ws-1', contactId: 'c-2', contactName: 'Stefan Weber', className: 'Massage Beratung', startsAt: upcoming(2, 14, 30), durationMin: 30, channel: 'whatsapp', kind: 'consult', createdAt: ago(25) },
+  { _id: 'a-3', workspaceId: 'ws-1', contactId: 'c-10', contactName: 'David Chen', className: 'Signature Glow (Trial)', startsAt: upcoming(1, 10), durationMin: 45, channel: 'whatsapp', kind: 'trial', createdAt: ago(35) },
+  { _id: 'a-4', workspaceId: 'ws-1', contactId: 'c-6', contactName: 'Yuki Tanaka', className: 'Premium Spa Package', startsAt: upcoming(2, 16), durationMin: 90, channel: 'whatsapp', kind: 'regular', createdAt: ago(120) },
+  { _id: 'a-5', workspaceId: 'ws-1', contactId: 'c-3', contactName: 'Clara Schmidt', className: 'Yin Yoga', startsAt: upcoming(0, 18, 30), durationMin: 75, channel: 'whatsapp', kind: 'regular', createdAt: ago(60) },
+]
+
+// ── Comment Automations (2) ───────────────────────────────────────────────────
 
 export const mockCommentAutomations: MockCommentAutomation[] = [
   {
     _id: 'ca-1',
     workspaceId: 'ws-1',
-    keyword: 'CLASS',
-    postLabel: 'Morning Flow reel · Jun 28',
-    openingDm: "Hi {{name}}! Here's our full class schedule. Want me to book you a free trial?",
+    keyword: 'PROBE',
+    postLabel: 'Morning Flow Reel · Jul 14',
+    openingDm: 'Hallo {{name}}! Hier ist unser kompletter Kursplan. Soll ich dir eine kostenlose Probestunde buchen?',
     status: 'active',
-    stats: { commentsCaptured: 47, dmsSent: 44, booked: 9 },
-    createdAt: ago(8640),
+    stats: { commentsCaptured: 63, dmsSent: 58, booked: 14 },
+    createdAt: ago(4320),
   },
   {
     _id: 'ca-2',
     workspaceId: 'ws-1',
-    keyword: 'RETREAT',
-    postLabel: 'Weekend retreat carousel · Jun 30',
-    openingDm: 'Hi {{name}}! The next retreat is coming up — want the details and early-bird pricing?',
-    status: 'paused',
-    stats: { commentsCaptured: 12, dmsSent: 12, booked: 2 },
-    createdAt: ago(5760),
+    keyword: 'MASSAGE',
+    postLabel: 'Massage Carousel · Jul 10',
+    openingDm: 'Hallo {{name}}! Unsere Massagen sind beliebt — möchtest du die Verfügbarkeit sehen und einen Termin buchen?',
+    status: 'active',
+    stats: { commentsCaptured: 28, dmsSent: 26, booked: 7 },
+    createdAt: ago(2880),
   },
 ]
+
+// ── 3 AI-Driven Campaigns (German goals) ─────────────────────────────────────
 
 export const mockCampaigns: MockCampaign[] = [
   {
     _id: 'camp-1',
     workspaceId: 'ws-1',
-    name: 'New Inquiry Welcome',
+    name: 'Willkommen Neukunde',
     status: 'active',
     triggerStage: 'inquiry',
-    goal: 'Welcome the lead, find out what they want, and book them into a free trial class this week. Offer the most relevant class based on what they say.',
+    goal: 'Begrüße den Neukunden herzlich, finde heraus was er sucht (Yoga, Massage oder Gesichtsbehandlung), und buche eine kostenlose Probestunde. Erwähne unsere kleinen Gruppen (max. 14 Teilnehmer) als Vorteil.',
     flow: [],
     createdAt: ago(10080),
     updatedAt: ago(1440),
@@ -257,10 +353,10 @@ export const mockCampaigns: MockCampaign[] = [
   {
     _id: 'camp-2',
     workspaceId: 'ws-1',
-    name: 'Post Trial Follow-up',
+    name: 'Nach Probestunde',
     status: 'active',
     triggerStage: 'attended',
-    goal: 'Thank them for coming, ask how it went, then convert them to a paid membership with a first-month offer (unlimited 1,999 THB). Handle the "I need to think about it" objection.',
+    goal: 'Bedanke dich für den Besuch, frage wie es war, und konvertiere zum bezahlten Monatstarif (199€). Biete die 10er-Karte (380€) als Alternative an. Behandle die Einwandrede "Ich muss überlegen" mit einem konkreten Grund, jetzt zu starten.',
     flow: [],
     createdAt: ago(5040),
     updatedAt: ago(720),
@@ -268,14 +364,23 @@ export const mockCampaigns: MockCampaign[] = [
   {
     _id: 'camp-3',
     workspaceId: 'ws-1',
-    name: 'Re-engagement',
-    status: 'draft',
+    name: 'Reaktivierung',
+    status: 'active',
     triggerStage: 'qualified',
-    goal: 'Win back a qualified lead who went quiet. Acknowledge they were interested, offer a concrete reason to return (a new class, a limited offer, or a consult), and book them in.',
+    goal: 'Gewinne einen qualifizierten Lead zurück, der nicht geantwortet hat. Erinnere ihn, dass er interessiert war, biete einen konkreten Grund zur Rückkehr (neue Kurszeiten, limited Angebot, kostenlose Woche), und buche einen Termin.',
     flow: [],
     createdAt: ago(2880),
     updatedAt: ago(2880),
   },
+]
+
+// ── Mock Channel Connections (all connected) ──────────────────────────────────
+
+export const mockChannelConnections = [
+  { id: 'cc-1', workspaceId: 'ws-1', channel: 'whatsapp', credentials: { instanceName: 'zenno-studio', phoneNumber: '+49 30 12345678' }, instanceName: 'zenno-studio', status: 'connected', phoneNumber: '+49 30 12345678', warmupStartedAt: ago(10080), limits: { dailyCapBase: 20, dailyCapMax: 200, minDelaySeconds: 15 }, sentDate: null, sentToday: 0, lastSentAt: ago(8) },
+  { id: 'cc-2', workspaceId: 'ws-1', channel: 'instagram', credentials: { pageAccessToken: 'mock-token', pageId: 'mock-page-id' }, instanceName: 'zenno-ig', status: 'connected', phoneNumber: null, warmupStartedAt: null, limits: { dailyCapBase: 20, dailyCapMax: 200, minDelaySeconds: 15 }, sentDate: null, sentToday: 0, lastSentAt: ago(12) },
+  { id: 'cc-3', workspaceId: 'ws-1', channel: 'messenger', credentials: { pageAccessToken: 'mock-token', pageId: 'mock-page-id' }, instanceName: 'zenno-fb', status: 'connected', phoneNumber: null, warmupStartedAt: null, limits: { dailyCapBase: 20, dailyCapMax: 200, minDelaySeconds: 15 }, sentDate: null, sentToday: 0, lastSentAt: ago(20) },
+  { id: 'cc-4', workspaceId: 'ws-1', channel: 'webchat', credentials: { embedKey: 'zenno-webchat-key-2026' }, instanceName: 'zenno-web', status: 'connected', phoneNumber: null, warmupStartedAt: null, limits: { dailyCapBase: 20, dailyCapMax: 200, minDelaySeconds: 15 }, sentDate: null, sentToday: 0, lastSentAt: ago(40) },
 ]
 
 // Runtime mutable state (survives within a single server process)
@@ -288,7 +393,7 @@ let _tasks = [...mockTasks]
 let _schedule = [...mockSchedule]
 let _appointments = [...mockAppointments]
 let _commentAutomations = [...mockCommentAutomations]
-let _channelConnections: Array<Record<string, any> & { id: string; workspaceId: string; channel: string }> = []
+let _channelConnections: Array<Record<string, any> & { id: string; workspaceId: string; channel: string }> = [...mockChannelConnections] as any
 
 let _nextId = 1000
 function uid() { return `mock-${++_nextId}` }
@@ -472,6 +577,10 @@ export const MockDB = {
   setSystemPrompt: (workspaceId: string, prompt: string) => {
     _systemPrompts = { ..._systemPrompts, [workspaceId]: prompt }
   },
+  getVoiceProfile: (workspaceId: string) => _voiceProfiles[workspaceId] ?? null,
+  setVoiceProfile: (workspaceId: string, profile: string) => {
+    _voiceProfiles = { ..._voiceProfiles, [workspaceId]: profile }
+  },
   getGuardrails: (workspaceId: string): MockGuardrails =>
     _guardrails[workspaceId] ?? { alwaysEscalateTopics: [], maxDiscountPercent: null, businessHoursOnly: false },
   setGuardrails: (workspaceId: string, guardrails: MockGuardrails) => {
@@ -485,16 +594,31 @@ export interface MockGuardrails {
   businessHoursOnly: boolean
 }
 
-let _guardrails: Record<string, MockGuardrails> = {}
+let _guardrails: Record<string, MockGuardrails> = {
+  'ws-1': { alwaysEscalateTopics: ['Beschwerde', 'Rückerstattung', 'medizinisch'], maxDiscountPercent: 10, businessHoursOnly: false },
+}
 
-const DEFAULT_MOCK_SYSTEM_PROMPT = `You are a senior sales agent for Lotus Yoga Bangkok. Your job is to turn conversations into bookings and memberships — not just answer questions.
+let _voiceProfiles: Record<string, string> = {
+  'ws-1': 'Schreibe in kurzen, natürlichen Sätzen (2-3 Sätze). Sei warm aber professionell. Verwende "du" als Anrede. Keine Emojis außer 🌿 gelegentlich. Beende Nachrichten mit einer klaren Frage oder einem konkreten Vorschlag. Schreibe auf Deutsch, außer der Kunde schreibt Englisch.',
+}
 
-Qualify fast (one question at a time), build value before price, handle objections by reframing and proposing a next step, and always move toward a booking. Use your tools: check the schedule, book the moment they agree, create a deal when they evaluate a paid package, escalate refunds/complaints/medical to a human. Keep replies to 2–4 sentences, sound human, match their language, and never give up after one objection.
+const DEFAULT_MOCK_SYSTEM_PROMPT = `Du bist ein Senior Sales Agent für Zenno Studio Berlin — ein Premium Wellness- & Beauty-Studio in Mitte. Dein Ziel ist es, Gespräche in Buchungen und Umsatz zu verwandeln — nicht nur Fragen zu beantworten.
 
-Key knowledge:
-- Classes: Morning Flow (7am, 9am), Evening Yin (6:30pm), Weekend Workshop (Sat 10am)
-- Pricing: Drop-in 450 THB, 10-class pack 1,800 THB, Monthly unlimited 2,500 THB
-- Free trial class available for first-time visitors — lead with this for new inquiries
-- Location: Sukhumvit Soi 23, Bangkok`
+## Wie du verkaufst
+1. **Schnell qualifizieren** — eine Frage gleichzeitig. Finde heraus: was wollen sie, wann, welches Budget, was hält sie ab.
+2. **Wert vor Preis** — argumentiere mit Ergebnissen und Vorteilen (kleine Gruppen, persönliche Betreuung, erfahrene Therapeuten), BEVOR du einen Preis nennst.
+3. **Einwände behandeln** — wenn jemand "zu teuer" sagt, ist das der Start des Verkaufs, nicht das Ende. Anerkennen → umdeuten → nächsten Schritt vorschlagen (Probestunde, Beratung, kleinere Option).
+4. **Immer nächsten Schritt** — jede Antwort bewegt sich auf eine Buchung, Beratung oder Angebot zu. "Möchtest du, dass ich dir einen Platz reserviere?" statt "Melde dich einfach."
+5. **Werkzeuge nutzen** — check_schedule vor Terminvorschlägen. book_appointment sobald sie zustimmen. create_deal wenn ein kostenpflichtiges Paket besprochen wird. flag_for_human bei Beschwerden.
+6. **Tür offen lassen** — wenn es stockt, zusammenfassen was sie mochten, Wert wiederholen, klaren Weg zurück lassen.
+7. **Menschlich klingen** — kurze Antworten (2-4 Sätze).匹配 ihre Sprache (Deutsch oder Englisch). Keine Roboter-Sign-offs.
+
+## Was du nie tust
+- Preise, Zeiten oder Richtlinien erfinden, die nicht in deinem Wissen oder deinen Werkzeugen stehen.
+- Rabatte über 10% anbieten (Guardrail). Wenn mehr gefordert wird, an Mensch eskalieren.
+- Nach einem Einwand aufgeben. Mindestens zwei Ansätze versuchen.
+- Beschwerden, Rückerstattungen, medizinische Fragen selbst behandeln — immer eskalieren.
+
+Antworte immer in der gleichen Sprache wie der Kunde. Standard: Deutsch.`
 
 let _systemPrompts: Record<string, string> = {}

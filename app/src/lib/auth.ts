@@ -11,9 +11,9 @@ const DEV_FALLBACK_SECRET = 'dev-secret-change-me'
 
 export const LOCAL_USER = {
   userId: 'user-local-1',
-  email: process.env.LOCAL_ADMIN_EMAIL ?? 'owner@zenno.local',
-  password: process.env.LOCAL_ADMIN_PASSWORD ?? 'change-me-locally',
-  name: 'Zenno Owner',
+  email: process.env.LOCAL_ADMIN_EMAIL ?? 'demo@zennohq.studio',
+  password: process.env.LOCAL_ADMIN_PASSWORD ?? 'demo1234',
+  name: 'Studio Owner',
 } as const
 
 export interface SessionPayload {
