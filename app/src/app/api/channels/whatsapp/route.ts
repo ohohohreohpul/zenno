@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getChannelConnection, updateChannelConnection, upsertChannelConnection } from '@/lib/queries'
 import {
+  checkGatewayReachability,
   createInstance,
   destroyInstance,
   fetchQr,
@@ -8,6 +9,7 @@ import {
   GatewayRequestError,
   isGatewayConfigured,
   isExistingInstanceError,
+  type GatewayReachability,
   type QrResult,
 } from '@/lib/channels/wa-gateway'
 import { capsForWarmupDay, currentWarmupDay, normalizeSendLimits } from '@/lib/send-limits'
@@ -33,6 +35,9 @@ function instanceNameFor(workspaceId: string): string {
 
 interface StatusPayload {
   gateway_configured: boolean
+  gateway_url: string | null
+  gateway_status: number | null
+  gateway_error: string | null
   status: string
   phone_number: string | null
   qr: string | null
@@ -51,6 +56,7 @@ interface StatusPayload {
 
 function toPayload(
   conn: IChannelConnection | null,
+  reachability: GatewayReachability | null = null,
   qr: string | null = conn?.credentials?.pairingQr ?? null,
   pairingCode: string | null = conn?.credentials?.pairingCode ?? null,
 ): StatusPayload {
@@ -60,6 +66,9 @@ function toPayload(
   const tomorrowCaps = capsForWarmupDay(limits, warmupDay + 1)
   return {
     gateway_configured: isGatewayConfigured(),
+    gateway_url: reachability?.url ?? null,
+    gateway_status: reachability?.status ?? null,
+    gateway_error: reachability && !reachability.ok ? (reachability.error ?? `HTTP ${reachability.status}`) : null,
     status: conn?.status ?? 'disconnected',
     phone_number: conn?.phoneNumber ?? null,
     qr,
@@ -79,32 +88,45 @@ function toPayload(
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
+
+  // Lightweight endpoint to see why the gateway is unreachable from Vercel.
+  if (req.nextUrl.searchParams.get('diagnose') === 'true') {
+    const reachability = isGatewayConfigured()
+      ? await checkGatewayReachability()
+      : { url: '', ok: false, error: 'WA_GATEWAY_URL / WA_GATEWAY_API_KEY not set' }
+    return NextResponse.json({ data: reachability })
+  }
+
   if (!isGatewayConfigured()) {
     return NextResponse.json({ data: toPayload(null) })
   }
 
   try {
-    const conn = await getChannelConnection(workspaceId, 'whatsapp') as unknown as IChannelConnection | null
-    if (!conn) return NextResponse.json({ data: toPayload(null) })
+    const [conn, reachability] = await Promise.all([
+      getChannelConnection(workspaceId, 'whatsapp') as unknown as Promise<IChannelConnection | null>,
+      checkGatewayReachability(),
+    ])
 
     // Reconcile our stored status with the gateway's live session state. QR
     // refreshes arrive through QRCODE_UPDATED webhooks; polling this endpoint
     // must not repeatedly restart the underlying WhatsApp socket.
-    try {
-      const state = await fetchState(conn.instanceName)
-      if (state === 'open' && conn.status !== 'connected') {
-        conn.status = 'connected'
-        if (!conn.warmupStartedAt) conn.warmupStartedAt = new Date()
-        await updateChannelConnection(conn.id, { status: conn.status, warmupStartedAt: conn.warmupStartedAt })
-      } else if (state === 'close' && conn.status === 'connected') {
-        conn.status = 'disconnected'
-        await updateChannelConnection(conn.id, { status: conn.status })
+    if (conn) {
+      try {
+        const state = await fetchState(conn.instanceName)
+        if (state === 'open' && conn.status !== 'connected') {
+          conn.status = 'connected'
+          if (!conn.warmupStartedAt) conn.warmupStartedAt = new Date()
+          await updateChannelConnection(conn.id, { status: conn.status, warmupStartedAt: conn.warmupStartedAt })
+        } else if (state === 'close' && conn.status === 'connected') {
+          conn.status = 'disconnected'
+          await updateChannelConnection(conn.id, { status: conn.status })
+        }
+      } catch (error: unknown) {
+        console.error('[channels:whatsapp] gateway state check failed:', error)
       }
-    } catch (error: unknown) {
-      console.error('[channels:whatsapp] gateway state check failed:', error)
     }
 
-    return NextResponse.json({ data: toPayload(conn) })
+    return NextResponse.json({ data: toPayload(conn, reachability) })
   } catch (error: unknown) {
     console.error('[channels:whatsapp] status failed:', error)
     return NextResponse.json({ error: 'Could not load channel status' }, { status: 500 })
@@ -165,7 +187,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     }) as unknown as IChannelConnection
 
-    return NextResponse.json({ data: toPayload(conn, qr.qrBase64, qr.pairingCode) })
+    return NextResponse.json({ data: toPayload(conn, null, qr.qrBase64, qr.pairingCode) })
   } catch (error: unknown) {
     console.error('[channels:whatsapp] connect failed:', error)
     return NextResponse.json(

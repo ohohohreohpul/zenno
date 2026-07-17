@@ -76,6 +76,44 @@ export function isExistingInstanceError(error: unknown): boolean {
   )
 }
 
+export interface GatewayReachability {
+  url: string
+  ok: boolean
+  status?: number
+  error?: string
+}
+
+export async function checkGatewayReachability(): Promise<GatewayReachability> {
+  const url = process.env.WA_GATEWAY_URL?.trim() ?? ''
+  const apiKey = process.env.WA_GATEWAY_API_KEY?.trim() ?? ''
+  if (!url || !apiKey) {
+    return { url, ok: false, error: 'WA_GATEWAY_URL or WA_GATEWAY_API_KEY not set' }
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8_000)
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        apikey: apiKey,
+        Origin: process.env.PUBLIC_APP_URL ?? 'https://zen-agent.vercel.app',
+      },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    // Any HTTP response means DNS resolved and the server is reachable.
+    return { url, ok: true, status: res.status }
+  } catch (error: unknown) {
+    clearTimeout(timeout)
+    return {
+      url,
+      ok: false,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : 'unknown network error',
+    }
+  }
+}
+
 function webhookUrl(): string | null {
   const base =
     process.env.PUBLIC_APP_URL ??
