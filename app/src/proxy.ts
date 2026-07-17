@@ -6,7 +6,7 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth'
 
 export function proxy(request: NextRequest): NextResponse {
   const path = request.nextUrl.pathname
-  const publicApi = path.startsWith('/api/auth/') || path.startsWith('/api/webhooks/') || path === '/api/channels/zernio/oauth/callback' || path === '/api/webchat' || path === '/api/billing/webhook' || path === '/api/internal/campaigns/process'
+  const publicApi = path.startsWith('/api/auth/') || path.startsWith('/api/webhooks/') || path === '/api/webchat' || path === '/api/billing/webhook' || path === '/api/internal/campaigns/process'
   if (publicApi) return NextResponse.next()
 
   const token = request.cookies.get(SESSION_COOKIE)?.value

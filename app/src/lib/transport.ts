@@ -6,7 +6,6 @@ import { sendLine, sendLinePush } from './channels/line'
 import { sendTelegram } from './channels/telegram'
 import { sendMessenger } from './channels/messenger'
 import { isGatewayConfigured, sendGatewayText } from './channels/wa-gateway'
-import { parseZernioRecipient, sendZernioMessage } from './channels/zernio'
 import { tryReserveSend, type SendKind } from './send-limits'
 import type { IChannelConnection } from '@/models/ChannelConnection'
 
@@ -120,11 +119,6 @@ export async function deliverMessage(
 
       case 'messenger': {
         const conn = await findConnection(workspaceId, 'messenger')
-        const zernioRecipient = parseZernioRecipient(externalContactId)
-        if (conn?.credentials?.zernioAccountId && zernioRecipient?.accountId === conn.credentials.zernioAccountId) {
-          await sendZernioMessage(zernioRecipient.accountId, zernioRecipient.conversationId, text)
-          return DELIVERED
-        }
         const pageToken = conn?.credentials?.pageAccessToken
         if (!pageToken) return NOT_CONNECTED('messenger')
         await sendMessenger(pageToken, externalContactId, text)
@@ -133,11 +127,6 @@ export async function deliverMessage(
 
       case 'instagram': {
         const conn = await findConnection(workspaceId, 'instagram')
-        const zernioRecipient = parseZernioRecipient(externalContactId)
-        if (conn?.credentials?.zernioAccountId && zernioRecipient?.accountId === conn.credentials.zernioAccountId) {
-          await sendZernioMessage(zernioRecipient.accountId, zernioRecipient.conversationId, text)
-          return DELIVERED
-        }
         const pageToken = conn?.credentials?.pageAccessToken
         if (pageToken) {
           await sendInstagram(pageToken, externalContactId, text)
