@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/internal/campaigns/process",
-      "schedule": "* * * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }
