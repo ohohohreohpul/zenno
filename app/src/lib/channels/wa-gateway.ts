@@ -71,8 +71,9 @@ async function gatewayFetch(
 }
 
 export function isExistingInstanceError(error: unknown): boolean {
+  // Evolution v2 reports a duplicate name as 403 "This name ... is already in use".
   return error instanceof GatewayRequestError && (
-    error.status === 409 || /already exists|instance.*exist/i.test(error.responseBody)
+    error.status === 409 || /already exists|already in use|instance.*exist/i.test(error.responseBody)
   )
 }
 

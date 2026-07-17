@@ -241,7 +241,15 @@ async function completeRunIfFinished(runId: string | null | undefined): Promise<
   if (stats.queued + stats.retry + stats.sending === 0) await updateCampaignRun(runId, { status: 'completed', completedAt: new Date() })
 }
 
-export async function processCampaignQueue(batchSize = 1) {
+export interface QueueResult {
+  claimed: number
+  delivered: number
+  retry: number
+  failed: number
+  skipped: number
+}
+
+export async function processCampaignQueue(batchSize = 1): Promise<QueueResult> {
   const claimed = await claimCampaignEnrollments(batchSize) as unknown as ClaimedEnrollment[]
   const result = { claimed: claimed.length, delivered: 0, retry: 0, failed: 0, skipped: 0 }
   for (const enrollment of claimed) {
@@ -250,6 +258,31 @@ export async function processCampaignQueue(batchSize = 1) {
     if (status !== 'retry') await completeRunIfFinished(enrollment.runId)
   }
   return result
+}
+
+const DRAIN_BATCH_SIZE = 5
+const DRAIN_TIME_BUDGET_MS = 45_000
+
+function addQueueResults(a: QueueResult, b: QueueResult): QueueResult {
+  return {
+    claimed: a.claimed + b.claimed,
+    delivered: a.delivered + b.delivered,
+    retry: a.retry + b.retry,
+    failed: a.failed + b.failed,
+    skipped: a.skipped + b.skipped,
+  }
+}
+
+/** Repeatedly processes queue batches until the queue is empty or the time budget is spent. */
+export async function drainCampaignQueue(timeBudgetMs = DRAIN_TIME_BUDGET_MS): Promise<QueueResult> {
+  const startedAt = Date.now()
+  let totals: QueueResult = { claimed: 0, delivered: 0, retry: 0, failed: 0, skipped: 0 }
+  while (Date.now() - startedAt < timeBudgetMs) {
+    const batch = await processCampaignQueue(DRAIN_BATCH_SIZE)
+    totals = addQueueResults(totals, batch)
+    if (batch.claimed === 0) break
+  }
+  return totals
 }
 
 async function findActiveCampaignsForStage(workspaceId: string, stage: string): Promise<CampaignData[]> {

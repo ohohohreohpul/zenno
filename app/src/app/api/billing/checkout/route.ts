@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createCheckoutSession, CreditPackId } from '@/lib/stripe'
+import { createCheckoutSession, CreditPackId, isStripeConfigured } from '@/lib/stripe'
 import { requestAgencyId } from '@/lib/request-context'
 
 const schema = z.object({
@@ -9,6 +9,10 @@ const schema = z.object({
 })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ error: 'Payments are not available yet' }, { status: 503 })
+  }
+
   let body: unknown
   try {
     body = await req.json()

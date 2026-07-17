@@ -32,6 +32,14 @@ export interface IChannelCredentials {
   instagramId?: string
   /** Public embed key for the web chat widget. */
   embedKey?: string
+  /** Webchat widget appearance settings (see lib/channels/webchat-widget). */
+  widgetSettings?: {
+    accentColor?: string
+    title?: string
+    subtitle?: string
+    greeting?: string
+    position?: 'right' | 'left'
+  }
   /** Secret we generate and hand to the platform (e.g. Telegram secret_token). */
   webhookSecret?: string
 }

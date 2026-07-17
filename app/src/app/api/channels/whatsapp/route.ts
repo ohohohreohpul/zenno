@@ -169,8 +169,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
       qr = await createInstance(instanceName, phoneNumber)
     } catch (error: unknown) {
-      // Instance may already exist from a previous attempt — ask it for a QR.
+      // Instance may already exist from a previous attempt — reuse it.
       if (!isExistingInstanceError(error)) throw error
+      const state = await fetchState(instanceName).catch(() => 'unknown' as const)
+      if (state === 'open') {
+        // The WhatsApp session is already live — restore the connection instead of re-pairing.
+        conn = await upsertChannelConnection(workspaceId, 'whatsapp', {
+          instanceName,
+          status: 'connected',
+          limits: normalizeSendLimits(conn?.limits),
+          warmupStartedAt: conn?.warmupStartedAt ?? new Date(),
+        }) as unknown as IChannelConnection
+        return NextResponse.json({ data: toPayload(conn) })
+      }
       console.error('[channels:whatsapp] instance already exists, fetching a fresh QR:', error)
       qr = await fetchQr(instanceName, phoneNumber)
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { processCampaignQueue } from '@/lib/campaign-runner'
+import { drainCampaignQueue } from '@/lib/campaign-runner'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -13,7 +13,7 @@ async function handleProcess(req: NextRequest): Promise<NextResponse> {
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Campaign worker is not configured' }, { status: 503 })
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    return NextResponse.json({ data: await processCampaignQueue(1) })
+    return NextResponse.json({ data: await drainCampaignQueue() })
   } catch (error: unknown) {
     console.error('[campaign-worker] processing failed:', error)
     return NextResponse.json({ error: 'Campaign processing failed' }, { status: 500 })
