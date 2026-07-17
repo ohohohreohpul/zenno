@@ -20,7 +20,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     setSessionCookie(response, session)
     return oauth.apply(response)
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : 'Unknown error'
+    let message = 'Unknown error'
+    if (cause instanceof Error) {
+      message = cause.message
+    } else if (cause && typeof cause === 'object' && 'message' in cause) {
+      message = String((cause as { message: unknown }).message)
+    } else if (typeof cause === 'string') {
+      message = cause
+    }
     console.error('Google OAuth callback failed:', { message, code: code?.slice(0, 20), cause })
     return authError(origin, `Google sign-in failed: ${message}`)
   }
