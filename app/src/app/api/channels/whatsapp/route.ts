@@ -5,7 +5,9 @@ import {
   destroyInstance,
   fetchQr,
   fetchState,
+  GatewayRequestError,
   isGatewayConfigured,
+  isExistingInstanceError,
   type QrResult,
 } from '@/lib/channels/wa-gateway'
 import { capsForWarmupDay, currentWarmupDay, normalizeSendLimits } from '@/lib/send-limits'
@@ -146,7 +148,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       qr = await createInstance(instanceName, phoneNumber)
     } catch (error: unknown) {
       // Instance may already exist from a previous attempt — ask it for a QR.
-      console.error('[channels:whatsapp] create failed, trying reconnect:', error)
+      if (!isExistingInstanceError(error)) throw error
+      console.error('[channels:whatsapp] instance already exists, fetching a fresh QR:', error)
       qr = await fetchQr(instanceName, phoneNumber)
     }
 
@@ -166,10 +169,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (error: unknown) {
     console.error('[channels:whatsapp] connect failed:', error)
     return NextResponse.json(
-      { error: 'Could not start the WhatsApp connection — check the gateway' },
+      { error: gatewayConnectError(error) },
       { status: 502 },
     )
   }
+}
+
+function gatewayConnectError(error: unknown): string {
+  if (!(error instanceof GatewayRequestError)) {
+    return 'Could not reach the WhatsApp gateway. Check WA_GATEWAY_URL and that the gateway is online.'
+  }
+
+  if (error.status === 401 || error.status === 403) {
+    return 'The WhatsApp gateway rejected its API key. Check WA_GATEWAY_API_KEY.'
+  }
+  if (error.status === 404) {
+    return 'The WhatsApp gateway endpoint was not found. Check WA_GATEWAY_URL and gateway version.'
+  }
+  if (error.status >= 500) {
+    return 'The WhatsApp gateway is unavailable. Check its logs and restart it if needed.'
+  }
+  return `The WhatsApp gateway rejected the connection request (HTTP ${error.status}). Check its logs.`
 }
 
 export async function PATCH(req: NextRequest): Promise<NextResponse> {

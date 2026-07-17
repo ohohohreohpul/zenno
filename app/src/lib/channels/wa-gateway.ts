@@ -17,6 +17,17 @@ export interface QrResult {
   pairingCode: string | null
 }
 
+export class GatewayRequestError extends Error {
+  constructor(
+    readonly method: string,
+    readonly path: string,
+    readonly status: number,
+    readonly responseBody: string,
+  ) {
+    super(`Gateway ${method} ${path} failed: ${status}`)
+  }
+}
+
 export function isGatewayConfigured(): boolean {
   return Boolean(process.env.WA_GATEWAY_URL && process.env.WA_GATEWAY_API_KEY)
 }
@@ -50,13 +61,19 @@ async function gatewayFetch(
 
   const text = await res.text()
   if (!res.ok) {
-    throw new Error(`Gateway ${init.method ?? 'GET'} ${path} failed: ${res.status} ${text.slice(0, 300)}`)
+    throw new GatewayRequestError(init.method ?? 'GET', path, res.status, text.slice(0, 300))
   }
   try {
     return JSON.parse(text) as Record<string, unknown>
   } catch {
     return {}
   }
+}
+
+export function isExistingInstanceError(error: unknown): boolean {
+  return error instanceof GatewayRequestError && (
+    error.status === 409 || /already exists|instance.*exist/i.test(error.responseBody)
+  )
 }
 
 function webhookUrl(): string | null {
