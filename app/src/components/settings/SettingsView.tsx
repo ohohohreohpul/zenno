@@ -5,6 +5,7 @@ import { Check } from 'lucide-react'
 import { DEFAULT_GUARDRAILS, GuardrailsSection, type Guardrails } from './GuardrailsSection'
 import { WhatsAppConnectCard } from './WhatsAppConnectCard'
 import { CredentialChannelCard, type ChannelCardConfig } from './CredentialChannelCard'
+import { ZernioChannelCard } from './ZernioChannelCard'
 import { WebchatCard } from './WebchatCard'
 import { OptimizeCard } from './OptimizeCard'
 import { ScheduleSettings } from './ScheduleSettings'
@@ -34,36 +35,6 @@ const LINE_CONFIG: ChannelCardConfig = {
   ],
   helpText: 'After connecting, set the webhook URL shown here in the LINE console.',
   docsUrl: 'https://developers.line.biz/en/docs/messaging-api/',
-}
-
-const MESSENGER_CONFIG: ChannelCardConfig = {
-  id: 'messenger',
-  name: 'Facebook Messenger',
-  color: 'var(--channel-messenger)',
-  description: 'Paste a Page access token + app secret from your Meta app — inbound events route by page automatically',
-  endpoint: '/api/channels/messenger',
-  fields: [
-    { key: 'page_access_token', label: 'Page access token', placeholder: 'EAAxxxx', type: 'password' },
-    { key: 'app_secret', label: 'Meta app secret', placeholder: '••••••••', type: 'password' },
-  ],
-  helpText: 'After connecting, add the webhook URL + verify token shown here in the Meta app dashboard (messages subscription).',
-  docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',
-  meta: 'messenger',
-}
-
-const INSTAGRAM_CONFIG: ChannelCardConfig = {
-  id: 'instagram',
-  name: 'Instagram DM',
-  color: 'var(--channel-instagram)',
-  description: 'Connect an Instagram Professional account through your Meta app',
-  endpoint: '/api/channels/instagram',
-  fields: [
-    { key: 'page_access_token', label: 'Page access token', placeholder: 'EAAxxxx', type: 'password' },
-    { key: 'app_secret', label: 'Meta app secret', placeholder: '••••••••', type: 'password' },
-  ],
-  helpText: 'After connecting, add the webhook URL and verify token shown here to the Instagram webhook in Meta Developers.',
-  docsUrl: 'https://developers.facebook.com/docs/messenger-platform/instagram/',
-  meta: 'instagram',
 }
 
 export function SettingsView() {
@@ -271,8 +242,8 @@ export function SettingsView() {
             <WebchatCard />
             <CredentialChannelCard config={TELEGRAM_CONFIG} />
             <CredentialChannelCard config={LINE_CONFIG} />
-            <CredentialChannelCard config={MESSENGER_CONFIG} />
-            <CredentialChannelCard config={INSTAGRAM_CONFIG} />
+            <ZernioChannelCard channel="messenger" name="Facebook Messenger" color="var(--channel-messenger)" description="Connect a Facebook Page and let your AI receptionist answer Messenger conversations automatically." />
+            <ZernioChannelCard channel="instagram" name="Instagram DM" color="var(--channel-instagram)" description="Connect an Instagram Professional account and let your AI receptionist answer DMs automatically." />
             <GoogleCalendarCard />
           </div>
         )}

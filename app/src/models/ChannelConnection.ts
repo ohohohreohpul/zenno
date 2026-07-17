@@ -30,6 +30,10 @@ export interface IChannelCredentials {
   userAccessToken?: string | null
   /** Instagram professional account id linked to the connected page. */
   instagramId?: string
+  /** Zernio tenant/profile that owns this workspace's social connection. */
+  zernioProfileId?: string | null
+  /** Zernio social account used for inbox webhooks and sends. */
+  zernioAccountId?: string | null
   /** Public embed key for the web chat widget. */
   embedKey?: string
   /** Secret we generate and hand to the platform (e.g. Telegram secret_token). */

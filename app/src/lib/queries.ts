@@ -665,6 +665,22 @@ export async function getChannelConnectionByVerifyToken(verifyToken: string, cha
   return fromDb(data)
 }
 
+export async function getChannelConnectionByZernioAccountId(accountId: string, channel: string) {
+  if (IS_MOCK) return null
+  const { data, error } = await ensureSupa().from('channel_connections').select('*')
+    .eq('channel', channel).eq('status', 'connected').eq('credentials->>zernioAccountId', accountId).maybeSingle()
+  if (error) throw error
+  return fromDb(data)
+}
+
+export async function claimWebhookEvent(id: string, provider: string, eventType: string): Promise<boolean> {
+  if (IS_MOCK) return true
+  const { error } = await ensureSupa().from('webhook_events').insert({ id, provider, event_type: eventType })
+  if (!error) return true
+  if (error.code === '23505') return false
+  throw error
+}
+
 export async function createChannelConnection(data: Record<string, unknown>) {
   if (IS_MOCK) return MockDB.createChannelConnection(data as any)
   const { data: row, error } = await ensureSupa().from('channel_connections').insert(toDb(data)).select().single()
