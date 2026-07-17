@@ -26,6 +26,10 @@ export interface IChannelCredentials {
   appSecret?: string
   /** Per-workspace Meta webhook verification token. */
   verifyToken?: string
+  /** Long-lived Meta user token parked during OAuth while the user picks a page. */
+  userAccessToken?: string | null
+  /** Instagram professional account id linked to the connected page. */
+  instagramId?: string
   /** Public embed key for the web chat widget. */
   embedKey?: string
   /** Secret we generate and hand to the platform (e.g. Telegram secret_token). */

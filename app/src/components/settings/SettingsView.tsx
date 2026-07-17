@@ -48,6 +48,7 @@ const MESSENGER_CONFIG: ChannelCardConfig = {
   ],
   helpText: 'After connecting, add the webhook URL + verify token shown here in the Meta app dashboard (messages subscription).',
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',
+  meta: 'messenger',
 }
 
 const INSTAGRAM_CONFIG: ChannelCardConfig = {
@@ -62,10 +63,15 @@ const INSTAGRAM_CONFIG: ChannelCardConfig = {
   ],
   helpText: 'After connecting, add the webhook URL and verify token shown here to the Instagram webhook in Meta Developers.',
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/instagram/',
+  meta: 'instagram',
 }
 
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<'channels' | 'ai' | 'workspace'>('ai')
+  const [activeTab, setActiveTab] = useState<'channels' | 'ai' | 'workspace'>(() => {
+    if (typeof window === 'undefined') return 'ai'
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    return tab === 'channels' || tab === 'workspace' ? tab : 'ai'
+  })
   const [systemPrompt, setSystemPrompt] = useState('')
   const [knowledgeSummary, setKnowledgeSummary] = useState('')
   const [runtime, setRuntime] = useState<{ configured: boolean; provider: string | null; model: string | null }>({ configured: false, provider: null, model: null })
