@@ -40,10 +40,11 @@ const MESSENGER_CONFIG: ChannelCardConfig = {
   id: 'messenger',
   name: 'Facebook Messenger',
   color: 'var(--channel-messenger)',
-  description: 'Paste a Page access token from your Meta app — inbound events route by page automatically',
+  description: 'Paste a Page access token + app secret from your Meta app — inbound events route by page automatically',
   endpoint: '/api/channels/messenger',
   fields: [
     { key: 'page_access_token', label: 'Page access token', placeholder: 'EAAxxxx', type: 'password' },
+    { key: 'app_secret', label: 'Meta app secret', placeholder: '••••••••', type: 'password' },
   ],
   helpText: 'After connecting, add the webhook URL + verify token shown here in the Meta app dashboard (messages subscription).',
   docsUrl: 'https://developers.facebook.com/docs/messenger-platform/webhooks',

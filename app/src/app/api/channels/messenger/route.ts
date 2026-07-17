@@ -43,15 +43,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
 
-  let body: { page_access_token?: unknown }
+  let body: { page_access_token?: unknown; app_secret?: unknown }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
   const token = typeof body.page_access_token === 'string' ? body.page_access_token.trim() : ''
-  if (!token) {
-    return NextResponse.json({ error: 'page_access_token is required' }, { status: 400 })
+  const appSecret = typeof body.app_secret === 'string' ? body.app_secret.trim() : ''
+  if (!token || !appSecret) {
+    return NextResponse.json({ error: 'page_access_token and app_secret are required' }, { status: 400 })
   }
 
   try {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await upsertChannelConnection(workspaceId, 'messenger', {
           status: 'connected',
           instanceName: connectionInstanceName('messenger', workspaceId),
-          credentials: { pageAccessToken: token, pageId, botUsername: pageName },
+          credentials: { pageAccessToken: token, pageId, appSecret, botUsername: pageName },
     })
     return NextResponse.json(payload(workspaceId, 'connected', pageName))
   } catch (error: unknown) {
@@ -74,7 +75,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   try {
     const conn = await getChannelConnection(workspaceId, 'messenger') as { id: string } | null
-    if (conn) await updateChannelConnection(conn.id, { status: 'disconnected', credentials: { pageAccessToken: null, pageId: null } })
+    if (conn) await updateChannelConnection(conn.id, { status: 'disconnected', credentials: { pageAccessToken: null, pageId: null, appSecret: null } })
     return NextResponse.json(payload(workspaceId, 'disconnected'))
   } catch (error: unknown) {
     console.error('[channels:messenger] disconnect failed:', error)

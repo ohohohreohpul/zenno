@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyMetaSignature } from '@/lib/channels/instagram'
 import { getChannelConnectionByPageId } from '@/lib/queries'
 import { handleIncoming } from '@/lib/conversation'
 import { MESSENGER_VERIFY_TOKEN } from '@/lib/channels/messenger-verify'
@@ -6,7 +7,8 @@ import { MESSENGER_VERIFY_TOKEN } from '@/lib/channels/messenger-verify'
 /**
  * Meta (Messenger) webhook — app-level. GET handles Meta's subscription
  * challenge; POST receives page messaging events, routed to workspaces by
- * page id (each workspace stores its page id when connecting).
+ * page id. Every event batch must carry a valid X-Hub-Signature-256 HMAC
+ * matching the app secret stored on the page's connection.
  */
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -31,21 +33,30 @@ interface MessengerEntry {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const rawBody = await req.text()
   let payload: { object?: string; entry?: MessengerEntry[] }
   try {
-    payload = await req.json()
+    payload = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
   if (payload.object !== 'page') return NextResponse.json({ status: 'ignored' })
+
+  const signature = req.headers.get('x-hub-signature-256') ?? ''
 
   try {
     for (const entry of payload.entry ?? []) {
       const pageId = entry.id
       if (!pageId) continue
 
-      const conn = await getChannelConnectionByPageId(pageId) as { workspaceId: string } | null
-      if (!conn) continue
+      const conn = await getChannelConnectionByPageId(pageId) as {
+        workspaceId: string
+        credentials?: { appSecret?: string }
+      } | null
+      const appSecret = conn?.credentials?.appSecret
+      if (!conn || !appSecret || !verifyMetaSignature(rawBody, signature, appSecret)) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
 
       for (const event of entry.messaging ?? []) {
         const senderId = event.sender?.id
