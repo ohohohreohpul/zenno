@@ -206,8 +206,8 @@ export function WhatsAppConnectCard() {
 
       {!status.gateway_configured && (
         <div style={{ fontSize: 12, color: 'var(--text-tertiary)', background: 'var(--sidebar)', borderRadius: 'var(--radius-sm)', padding: 12 }}>
-          The session gateway is not configured yet. Set <code>WA_GATEWAY_URL</code> and{' '}
-          <code>WA_GATEWAY_API_KEY</code> to enable connecting a number.
+          The session gateway is not configured yet. Set <code>WAHA_GATEWAY_URL</code> and{' '}
+          <code>WAHA_GATEWAY_API_KEY</code> to enable connecting a number.
         </div>
       )}
 
