@@ -11,7 +11,7 @@ import {
   isExistingInstanceError,
   type GatewayReachability,
   type QrResult,
-} from '@/lib/channels/wa-gateway'
+} from '@/lib/channels/waha-gateway'
 import { capsForWarmupDay, currentWarmupDay, normalizeSendLimits } from '@/lib/send-limits'
 import { DEFAULT_SEND_LIMITS, type IChannelConnection } from '@/models/ChannelConnection'
 
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (req.nextUrl.searchParams.get('diagnose') === 'true') {
     const reachability = isGatewayConfigured()
       ? await checkGatewayReachability()
-      : { url: '', ok: false, error: 'WA_GATEWAY_URL / WA_GATEWAY_API_KEY not set' }
+      : { url: '', ok: false, error: 'WAHA_GATEWAY_URL / WAHA_GATEWAY_API_KEY not set' }
     return NextResponse.json({ data: reachability })
   }
 
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const workspaceId = workspaceIdFrom(req)
   if (!isGatewayConfigured()) {
     return NextResponse.json(
-      { error: 'The WhatsApp gateway is not configured (WA_GATEWAY_URL / WA_GATEWAY_API_KEY)' },
+      { error: 'The WhatsApp gateway is not configured (WAHA_GATEWAY_URL / WAHA_GATEWAY_API_KEY)' },
       { status: 503 },
     )
   }
@@ -199,14 +199,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 function gatewayConnectError(error: unknown): string {
   if (!(error instanceof GatewayRequestError)) {
-    return 'Could not reach the WhatsApp gateway. Check WA_GATEWAY_URL and that the gateway is online.'
+    return 'Could not reach the WhatsApp gateway. Check WAHA_GATEWAY_URL and that the gateway is online.'
   }
 
   if (error.status === 401 || error.status === 403) {
-    return 'The WhatsApp gateway rejected its API key. Check WA_GATEWAY_API_KEY.'
+    return 'The WhatsApp gateway rejected its API key. Check WAHA_GATEWAY_API_KEY.'
   }
   if (error.status === 404) {
-    return 'The WhatsApp gateway endpoint was not found. Check WA_GATEWAY_URL and gateway version.'
+    return 'The WhatsApp gateway endpoint was not found. Check WAHA_GATEWAY_URL and gateway version.'
   }
   if (error.status >= 500) {
     return 'The WhatsApp gateway is unavailable. Check its logs and restart it if needed.'

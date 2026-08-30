@@ -12,6 +12,10 @@ export const CREDIT_PACKS = [
 
 export type CreditPackId = (typeof CREDIT_PACKS)[number]['id']
 
+export function isStripeConfigured(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY) && CREDIT_PACKS.every((pack) => pack.priceId !== '')
+}
+
 export function packByPriceId(priceId: string) {
   return CREDIT_PACKS.find((p) => p.priceId === priceId) ?? null
 }

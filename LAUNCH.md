@@ -15,11 +15,16 @@
 - `PUBLIC_APP_URL` (the production `https://` origin)
 - `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`
 
-For WhatsApp via the session gateway, also set:
+For WhatsApp via the WAHA session gateway, also set:
 
-- `WA_GATEWAY_URL`
-- `WA_GATEWAY_API_KEY`
-- `WA_GATEWAY_WEBHOOK_TOKEN`
+- `WAHA_GATEWAY_URL`
+- `WAHA_GATEWAY_API_KEY`
+- `WAHA_WEBHOOK_TOKEN`
+
+WAHA replaced the Evolution API gateway (2026-08-23) — the old
+`WA_GATEWAY_*` vars and `/api/webhooks/wa-gateway` route are dead but left in
+place during the transition. See `docs/waha-migration.md` for the deployment
+command and rollback notes.
 
 ## Before accepting customers
 

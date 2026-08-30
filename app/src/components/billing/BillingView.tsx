@@ -18,12 +18,43 @@ interface AgencyData {
 
 export function BillingView() {
   const [agency, setAgency] = useState<AgencyData | null>(null)
+  const [isBillingEnabled, setIsBillingEnabled] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [pendingPackId, setPendingPackId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/agency')
       .then((r) => r.json())
       .then((d) => setAgency(d.data))
+      .catch(() => setAgency(null))
+    fetch('/api/billing/status')
+      .then((r) => r.json())
+      .then((d) => setIsBillingEnabled(Boolean(d.data?.enabled)))
+      .catch(() => setIsBillingEnabled(false))
   }, [])
+
+  async function handleBuy(packId: string) {
+    if (!agency || pendingPackId) return
+    setCheckoutError(null)
+    setPendingPackId(packId)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agencyId: agency.id, packId: `pack_${packId}` }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.url) {
+        setCheckoutError(typeof body.error === 'string' ? body.error : 'Checkout is unavailable right now')
+        setPendingPackId(null)
+        return
+      }
+      window.location.assign(body.url)
+    } catch {
+      setCheckoutError('Checkout is unavailable right now')
+      setPendingPackId(null)
+    }
+  }
 
   const credits = agency?.credits ?? 0
   const usedPct = Math.max(0, Math.min(100, ((500 - credits) / 500) * 100))
@@ -73,9 +104,23 @@ export function BillingView() {
         {/* Credit packs */}
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 12 }}>Top up credits</div>
+          {!isBillingEnabled && (
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+              Online payments are launching soon. Contact us to top up your credits in the meantime.
+            </div>
+          )}
+          {checkoutError && (
+            <div style={{ fontSize: 12, color: 'var(--stage-vip)', marginBottom: 12 }}>{checkoutError}</div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {PACKS.map((pack) => (
-              <PackCard key={pack.id} pack={pack} />
+              <PackCard
+                key={pack.id}
+                pack={pack}
+                isEnabled={isBillingEnabled}
+                isPending={pendingPackId === pack.id}
+                onBuy={() => handleBuy(pack.id)}
+              />
             ))}
           </div>
         </div>
@@ -102,7 +147,14 @@ export function BillingView() {
   )
 }
 
-function PackCard({ pack }: { pack: typeof PACKS[0] }) {
+interface PackCardProps {
+  pack: typeof PACKS[0]
+  isEnabled: boolean
+  isPending: boolean
+  onBuy: () => void
+}
+
+function PackCard({ pack, isEnabled, isPending, onBuy }: PackCardProps) {
   return (
     <div
       style={{
@@ -149,6 +201,8 @@ function PackCard({ pack }: { pack: typeof PACKS[0] }) {
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{pack.pricePerMsg} per message</div>
       <button
+        disabled={!isEnabled || isPending}
+        onClick={onBuy}
         style={{
           width: '100%',
           padding: '9px',
@@ -158,11 +212,12 @@ function PackCard({ pack }: { pack: typeof PACKS[0] }) {
           color: pack.popular ? 'white' : 'var(--text-primary)',
           fontSize: 13,
           fontWeight: 600,
-          cursor: 'pointer',
+          cursor: isEnabled ? 'pointer' : 'not-allowed',
+          opacity: isEnabled ? 1 : 0.55,
           marginTop: 'auto',
         }}
       >
-        Buy {pack.credits.toLocaleString()} credits
+        {isPending ? 'Opening checkout…' : isEnabled ? `Buy ${pack.credits.toLocaleString()} credits` : 'Coming soon'}
       </button>
     </div>
   )
